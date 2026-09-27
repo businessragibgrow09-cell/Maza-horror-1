@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Maza Toilet Horror </title>
+    <title>Maja Toilet Horror Escape</title>
     <style>
         * {
             margin: 0; padding: 0;
@@ -107,12 +107,30 @@
 </head>
 <body>
 
+    <script>
+        // फोर्स लैंडस्केप और फुल स्क्रीन मोड कोड (कोड के अंदर ही सेट कर दिया है)
+        function forceLandscapeMode() {
+            if (screen.orientation && screen.orientation.lock) {
+                screen.orientation.lock('landscape').catch(() => {});
+            }
+        }
+        window.addEventListener('load', () => {
+            forceLandscapeMode();
+        });
+        document.addEventListener('click', () => {
+            forceLandscapeMode();
+            if (document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen().catch(() => {});
+            }
+        }, { once: true });
+    </script>
+
     <div id="game-container">
         <div id="crosshair"></div>
         <div id="danger-indicator"></div>
 
         <div id="jumpscare-overlay">
-            <div id="jumpscare-text">MAZA CAUGHT YOU!</div>
+            <div id="jumpscare-text">MAJA CAUGHT YOU!</div>
         </div>
 
         <div id="day-screen">DAY 1</div>
@@ -126,18 +144,18 @@
         <div class="action-btn" id="btn-interact">USE</div>
 
         <div id="start-screen" class="overlay">
-            <h1 class="title">MAZA HORROR TOILET </h1>
+            <h1 class="title">MAJA TOILET ESCAPE</h1>
             <p class="subtitle">
                 Story: Locked inside the cursed giant washroom, Maja is hunting you!<br>
                 1. Find the Crowbar.<br>
                 2. Smash crates to find the REAL Exit Key.<br>
                 3. Open the Main Gate & Escape!
             </p>
-            <button class="btn" id="start-btn">START </button>
+            <button class="btn" id="start-btn">START SURVIVAL</button>
         </div>
 
         <div id="victory-screen" class="overlay" style="display: none;">
-            <h1 class="title" style="color: #00ff66;">SKIP SUCCESSFUL!</h1>
+            <h1 class="title" style="color: #00ff66;">ESCAPE SUCCESSFUL!</h1>
             <p class="subtitle">You successfully unlocked the gate and escaped!</p>
             <button class="btn" onclick="location.reload()">PLAY AGAIN</button>
         </div>
@@ -174,9 +192,8 @@
                 this.sndBoxBreak = new Audio('https://files.catbox.moe/3gar1e.mp3');
                 this.sndKeyPickup = new Audio('https://files.catbox.moe/oaj33c.mp3');
                 this.sndJumpscare = new Audio('https://files.catbox.moe/3mbkym.mp3');
-                this.isAppActive = true;
 
-                // Handle background sound cut-off when app is minimized or tab changed
+                // ऐप बैकग्राउंड में जाने पर आवाज़ बंद करने के लिए
                 document.addEventListener("visibilitychange", () => {
                     if (document.hidden) {
                         this.pauseAll();
@@ -186,7 +203,7 @@
                 });
             }
             playBgMusic() { 
-                if (this.isAppActive && !document.hidden) { 
+                if (!document.hidden) { 
                     this.bgMusic.play().catch(()=>{}); 
                     this.monsterNearbySound.play().catch(()=>{}); 
                 } 
@@ -388,7 +405,7 @@
             }
         }
 
-        // CORRECT ORIGINAL MAJA MODEL
+        // ओरिजिनल माजा मॉडल क्लास
         class MajaEnemy {
             constructor(scene) {
                 this.scene = scene;
