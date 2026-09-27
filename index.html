@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Maja Toilet Horror Escape</title>
+    <title>Maza Toilet Horror </title>
     <style>
         * {
             margin: 0; padding: 0;
@@ -60,8 +60,8 @@
             border-radius: 50%; font-weight: bold; font-size: 0.85rem;
             display: flex; justify-content: center; align-items: center;
         }
-        #btn-crouch { bottom: 25px; right: 25px; width: 65px; height: 65px; background: rgba(0, 80, 180, 0.8); }
-        #btn-interact { bottom: 25px; right: 105px; width: 75px; height: 75px; border-color: #ffcc00; color: #ffcc00; display: none; background: rgba(0,0,0,0.9); }
+        #btn-crouch { bottom: 20px; right: 25px; width: 60px; height: 60px; background: rgba(0, 80, 180, 0.8); }
+        #btn-interact { bottom: 20px; right: 95px; width: 70px; height: 70px; border-color: #ffcc00; color: #ffcc00; display: none; background: rgba(0,0,0,0.9); }
 
         .overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
@@ -72,7 +72,7 @@
         }
 
         .title { font-size: 2.2rem; color: #ff2222; text-shadow: 0 0 15px #ff0000; margin-bottom: 12px; }
-        .subtitle { font-size: 0.95rem; color: #bbb; margin-bottom: 22px; line-height: 1.6; }
+        .subtitle { font-size: 0.95rem; color: #bbb; margin-bottom: 22px; line-height: 1.6; max-width: 600px; }
         .btn { padding: 12px 28px; font-size: 1rem; background: #111; color: #ff2222; border: 2px solid #ff2222; font-weight: bold; border-radius: 8px; cursor: pointer; }
 
         #interaction-prompt {
@@ -112,7 +112,7 @@
         <div id="danger-indicator"></div>
 
         <div id="jumpscare-overlay">
-            <div id="jumpscare-text">MAJA CAUGHT YOU IN THE TOILET!</div>
+            <div id="jumpscare-text">MAZA CAUGHT YOU!</div>
         </div>
 
         <div id="day-screen">DAY 1</div>
@@ -126,19 +126,19 @@
         <div class="action-btn" id="btn-interact">USE</div>
 
         <div id="start-screen" class="overlay">
-            <h1 class="title">MAJA TOILET ESCAPE</h1>
+            <h1 class="title">MAZA HORROR TOILET </h1>
             <p class="subtitle">
-                Story: Locked inside the cursed giant washroom by her master, Maja has turned into a vengeful spirit!<br>
-                1. Find the Crowbar in the restroom hall.<br>
+                Story: Locked inside the cursed giant washroom, Maja is hunting you!<br>
+                1. Find the Crowbar.<br>
                 2. Smash crates to find the REAL Exit Key.<br>
-                3. Open the Main Gate & Escape to Freedom!
+                3. Open the Main Gate & Escape!
             </p>
-            <button class="btn" id="start-btn">START SURVIVAL</button>
+            <button class="btn" id="start-btn">START </button>
         </div>
 
         <div id="victory-screen" class="overlay" style="display: none;">
-            <h1 class="title" style="color: #00ff66;">ESCAPE SUCCESSFUL!</h1>
-            <p class="subtitle">You successfully unlocked the gate and escaped the cursed toilet!</p>
+            <h1 class="title" style="color: #00ff66;">SKIP SUCCESSFUL!</h1>
+            <p class="subtitle">You successfully unlocked the gate and escaped!</p>
             <button class="btn" onclick="location.reload()">PLAY AGAIN</button>
         </div>
 
@@ -150,8 +150,8 @@
 
     <script>
         const MAZE_SIZE = 9;
-        const CELL_SIZE = 9.0; // SPACIOUS TOILET HALLWAYS
-        const WALL_HEIGHT = 7.0; // HIGH CEILING
+        const CELL_SIZE = 9.0;
+        const WALL_HEIGHT = 7.0;
         const PLAYER_SPEED = 8.5;
 
         const STATES = { MENU: 0, PLAYING: 1, CUTSCENE: 2, DEAD: 3, VICTORY: 4 };
@@ -175,13 +175,37 @@
                 this.sndKeyPickup = new Audio('https://files.catbox.moe/oaj33c.mp3');
                 this.sndJumpscare = new Audio('https://files.catbox.moe/3mbkym.mp3');
                 this.isAppActive = true;
+
+                // Handle background sound cut-off when app is minimized or tab changed
+                document.addEventListener("visibilitychange", () => {
+                    if (document.hidden) {
+                        this.pauseAll();
+                    } else if (currentState === STATES.PLAYING) {
+                        this.playBgMusic();
+                    }
+                });
             }
-            playBgMusic() { if(this.isAppActive){ this.bgMusic.play().catch(()=>{}); this.monsterNearbySound.play().catch(()=>{}); } }
-            setNearbyVolume(vol) { this.monsterNearbySound.volume = Math.min(1.0, Math.max(0, vol)); }
-            playCrowbar() { if(this.isAppActive){ this.sndCrowbar.currentTime = 0; this.sndCrowbar.play().catch(()=>{}); } }
-            playBoxBreak() { if(this.isAppActive){ this.sndBoxBreak.currentTime = 0; this.sndBoxBreak.play().catch(()=>{}); } }
-            playKeyPickup() { if(this.isAppActive){ this.sndKeyPickup.currentTime = 0; this.sndKeyPickup.play().catch(()=>{}); } }
-            playJumpscare() { if(this.isAppActive){ this.sndJumpscare.currentTime = 0; this.sndJumpscare.play().catch(()=>{}); } }
+            playBgMusic() { 
+                if (this.isAppActive && !document.hidden) { 
+                    this.bgMusic.play().catch(()=>{}); 
+                    this.monsterNearbySound.play().catch(()=>{}); 
+                } 
+            }
+            pauseAll() {
+                this.bgMusic.pause();
+                this.monsterNearbySound.pause();
+            }
+            setNearbyVolume(vol) { 
+                if (!document.hidden) {
+                    this.monsterNearbySound.volume = Math.min(1.0, Math.max(0, vol)); 
+                } else {
+                    this.monsterNearbySound.volume = 0;
+                }
+            }
+            playCrowbar() { if(!document.hidden){ this.sndCrowbar.currentTime = 0; this.sndCrowbar.play().catch(()=>{}); } }
+            playBoxBreak() { if(!document.hidden){ this.sndBoxBreak.currentTime = 0; this.sndBoxBreak.play().catch(()=>{}); } }
+            playKeyPickup() { if(!document.hidden){ this.sndKeyPickup.currentTime = 0; this.sndKeyPickup.play().catch(()=>{}); } }
+            playJumpscare() { if(!document.hidden){ this.sndJumpscare.currentTime = 0; this.sndJumpscare.play().catch(()=>{}); } }
         }
         const audio = new SoundEngine();
 
@@ -364,7 +388,7 @@
             }
         }
 
-        // CORRECT ORIGINAL MAJA 3D MONSTER MODEL LINK
+        // CORRECT ORIGINAL MAJA MODEL
         class MajaEnemy {
             constructor(scene) {
                 this.scene = scene;
@@ -499,7 +523,6 @@
             }
 
             initMaze() {
-                // SMOOTH TOILET HALL LAYOUT - NO BLOCKED PATHS
                 this.grid = [
                     [1,1,1,1,1,1,1,1,1],
                     [1,0,0,0,1,0,0,0,1],
@@ -543,7 +566,6 @@
             spawnObjects() {
                 const loader = new THREE.GLTFLoader();
 
-                // 1. CROWBAR
                 const cbX = 1.5 * CELL_SIZE, cbZ = 1.5 * CELL_SIZE;
                 const cbGroup = new THREE.Group();
                 cbGroup.position.set(cbX, 0.5, cbZ);
@@ -565,7 +587,6 @@
                 });
                 this.crowbar = { mesh: cbGroup, light: cbLight, collected: false, pos: new THREE.Vector3(cbX, 0.5, cbZ) };
 
-                // 2. CRATES & KEYS
                 const boxLocs = [
                     { x: 7.5 * CELL_SIZE, z: 1.5 * CELL_SIZE },
                     { x: 1.5 * CELL_SIZE, z: 7.5 * CELL_SIZE },
@@ -605,7 +626,6 @@
                     });
                 });
 
-                // 3. MAIN EXIT GATE
                 const gateX = 4.5 * CELL_SIZE, gateZ = 8.5 * CELL_SIZE;
                 const gate = new THREE.Mesh(new THREE.BoxGeometry(CELL_SIZE * 0.9, WALL_HEIGHT, 0.8), new THREE.MeshStandardMaterial({ color: 0x4a2a18 }));
                 gate.position.set(gateX, WALL_HEIGHT/2, gateZ);
