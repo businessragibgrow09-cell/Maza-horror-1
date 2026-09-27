@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>3D Maja Horror Escape - Full Fixed Game</title>
+    <title>Maja Toilet Horror Escape</title>
     <style>
         * {
             margin: 0; padding: 0;
@@ -19,23 +19,20 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             position: fixed;
         }
-        #game-container {
-            width: 100%; height: 100%; position: relative;
-        }
+        #game-container { width: 100%; height: 100%; position: relative; }
         canvas { width: 100%; height: 100%; display: block; }
 
         #crosshair {
             position: absolute; top: 50%; left: 50%;
-            width: 6px; height: 6px;
+            width: 8px; height: 8px;
             background: #00ffcc; border-radius: 50%;
             transform: translate(-50%, -50%);
             pointer-events: none; z-index: 10;
-            box-shadow: 0 0 6px #00ffcc;
+            box-shadow: 0 0 8px #00ffcc;
         }
 
         #touch-zone-left, #touch-zone-right {
-            position: absolute; bottom: 0;
-            width: 50%; height: 85%; z-index: 12;
+            position: absolute; bottom: 0; width: 50%; height: 85%; z-index: 12;
         }
         #touch-zone-left { left: 0; }
         #touch-zone-right { right: 0; }
@@ -68,7 +65,7 @@
 
         .overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(4, 4, 6, 0.96);
+            background: rgba(10, 10, 15, 0.96);
             display: flex; flex-direction: column;
             justify-content: center; align-items: center;
             color: #fff; z-index: 20; text-align: center; padding: 20px;
@@ -93,17 +90,11 @@
 
         #jumpscare-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(180, 0, 0, 0.9);
+            background: rgba(180, 0, 0, 0.95);
             z-index: 35; display: none; flex-direction: column;
             justify-content: center; align-items: center;
-            animation: flash 0.12s infinite alternate;
         }
-        #jumpscare-text { color: #fff; font-size: 2.6rem; font-weight: 900; }
-
-        @keyframes flash {
-            0% { background: rgba(255, 0, 0, 0.95); }
-            100% { background: rgba(30, 0, 0, 0.98); }
-        }
+        #jumpscare-text { color: #fff; font-size: 2.5rem; font-weight: 900; text-shadow: 0 0 20px #000; }
 
         #day-screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
@@ -121,7 +112,7 @@
         <div id="danger-indicator"></div>
 
         <div id="jumpscare-overlay">
-            <div id="jumpscare-text">MAJA CAUGHT YOU!</div>
+            <div id="jumpscare-text">MAJA CAUGHT YOU IN THE TOILET!</div>
         </div>
 
         <div id="day-screen">DAY 1</div>
@@ -135,17 +126,19 @@
         <div class="action-btn" id="btn-interact">USE</div>
 
         <div id="start-screen" class="overlay">
-            <h1 class="title">MAJA HORROR ESCAPE</h1>
+            <h1 class="title">MAJA TOILET ESCAPE</h1>
             <p class="subtitle">
-                1. Find & Pick up Crowbar<br>
-                2. Break Crates & Find REAL Exit Key<br>
-                3. Follow Glowing Gate Light & Escape!
+                Story: Locked inside the cursed giant washroom by her master, Maja has turned into a vengeful spirit!<br>
+                1. Find the Crowbar in the restroom hall.<br>
+                2. Smash crates to find the REAL Exit Key.<br>
+                3. Open the Main Gate & Escape to Freedom!
             </p>
-            <button class="btn" id="start-btn">START GAME</button>
+            <button class="btn" id="start-btn">START SURVIVAL</button>
         </div>
 
         <div id="victory-screen" class="overlay" style="display: none;">
-            <h1 class="title" style="color: #00ff66;">YOU ESCAPED!</h1>
+            <h1 class="title" style="color: #00ff66;">ESCAPE SUCCESSFUL!</h1>
+            <p class="subtitle">You successfully unlocked the gate and escaped the cursed toilet!</p>
             <button class="btn" onclick="location.reload()">PLAY AGAIN</button>
         </div>
 
@@ -156,10 +149,10 @@
     </div>
 
     <script>
-        const MAZE_SIZE = 13;
-        const CELL_SIZE = 6.0;
-        const WALL_HEIGHT = 4.2;
-        const PLAYER_SPEED = 7.0;
+        const MAZE_SIZE = 9;
+        const CELL_SIZE = 9.0; // SPACIOUS TOILET HALLWAYS
+        const WALL_HEIGHT = 7.0; // HIGH CEILING
+        const PLAYER_SPEED = 8.5;
 
         const STATES = { MENU: 0, PLAYING: 1, CUTSCENE: 2, DEAD: 3, VICTORY: 4 };
         let currentState = STATES.MENU;
@@ -167,7 +160,6 @@
         let scene, camera, renderer, clock;
         let dayCount = 1;
 
-        // --- AUDIO ENGINE WITH BACKGROUND TAB MUTING ---
         class SoundEngine {
             constructor() {
                 this.bgMusic = new Audio('https://files.catbox.moe/t1l55y');
@@ -182,56 +174,10 @@
                 this.sndBoxBreak = new Audio('https://files.catbox.moe/3gar1e.mp3');
                 this.sndKeyPickup = new Audio('https://files.catbox.moe/oaj33c.mp3');
                 this.sndJumpscare = new Audio('https://files.catbox.moe/3mbkym.mp3');
-
                 this.isAppActive = true;
-                this.setupTabVisibilityHandler();
             }
-
-            setupTabVisibilityHandler() {
-                const handleVisibility = () => {
-                    if (document.hidden || !document.hasFocus()) {
-                        this.isAppActive = false;
-                        this.pauseAllAudio();
-                    } else {
-                        this.isAppActive = true;
-                        if (currentState === STATES.PLAYING) {
-                            this.resumeAllAudio();
-                        }
-                    }
-                };
-
-                document.addEventListener('visibilitychange', handleVisibility);
-                window.addEventListener('blur', () => {
-                    this.isAppActive = false;
-                    this.pauseAllAudio();
-                });
-                window.addEventListener('focus', () => {
-                    this.isAppActive = true;
-                    if (currentState === STATES.PLAYING) this.resumeAllAudio();
-                });
-            }
-
-            pauseAllAudio() {
-                this.bgMusic.pause();
-                this.monsterNearbySound.pause();
-            }
-
-            resumeAllAudio() {
-                if (!this.isAppActive) return;
-                this.bgMusic.play().catch(()=>{});
-                this.monsterNearbySound.play().catch(()=>{});
-            }
-
-            playBgMusic() {
-                if (!this.isAppActive) return;
-                this.bgMusic.play().catch(()=>{});
-                this.monsterNearbySound.play().catch(()=>{});
-            }
-
-            setNearbyVolume(vol) {
-                this.monsterNearbySound.volume = Math.min(1.0, Math.max(0, vol));
-            }
-
+            playBgMusic() { if(this.isAppActive){ this.bgMusic.play().catch(()=>{}); this.monsterNearbySound.play().catch(()=>{}); } }
+            setNearbyVolume(vol) { this.monsterNearbySound.volume = Math.min(1.0, Math.max(0, vol)); }
             playCrowbar() { if(this.isAppActive){ this.sndCrowbar.currentTime = 0; this.sndCrowbar.play().catch(()=>{}); } }
             playBoxBreak() { if(this.isAppActive){ this.sndBoxBreak.currentTime = 0; this.sndBoxBreak.play().catch(()=>{}); } }
             playKeyPickup() { if(this.isAppActive){ this.sndKeyPickup.currentTime = 0; this.sndKeyPickup.play().catch(()=>{}); } }
@@ -239,53 +185,16 @@
         }
         const audio = new SoundEngine();
 
-        class MazeGenerator {
-            constructor(size) {
-                this.size = size;
-                this.grid = Array(size).fill(null).map(() => Array(size).fill(1));
-            }
-            generate() {
-                const stack = [];
-                this.grid[1][1] = 0;
-                stack.push([1, 1]);
-
-                while (stack.length > 0) {
-                    const [r, c] = stack[stack.length - 1];
-                    const neighbors = [];
-                    const dirs = [[-2, 0], [2, 0], [0, -2], [0, 2]];
-
-                    for (let [dr, dc] of dirs) {
-                        const nr = r + dr, nc = c + dc;
-                        if (nr > 0 && nr < this.size - 1 && nc > 0 && nc < this.size - 1 && this.grid[nr][nc] === 1) {
-                            neighbors.push([nr, nc, dr, dc]);
-                        }
-                    }
-
-                    if (neighbors.length > 0) {
-                        const [nr, nc, dr, dc] = neighbors[Math.floor(Math.random() * neighbors.length)];
-                        this.grid[r + dr / 2][c + dc / 2] = 0;
-                        this.grid[nr][nc] = 0;
-                        stack.push([nr, nc]);
-                    } else {
-                        stack.pop();
-                    }
-                }
-                return this.grid;
-            }
-        }
-
-        // --- PLAYER & 2-HANDS ANIMATED SYSTEM ---
         class MobilePlayerController {
             constructor(camera) {
                 this.camera = camera;
                 this.moveInput = new THREE.Vector2(0, 0);
                 this.isCrouching = false;
                 this.pitch = 0; this.yaw = 0;
-                this.targetHeight = 1.6;
+                this.targetHeight = 2.0;
 
                 this.handsGroup = new THREE.Group();
-                this.leftArm = null;
-                this.rightArm = null;
+                this.leftArm = null; this.rightArm = null;
                 this.heldItem = null;
                 this.walkCycle = 0;
 
@@ -295,35 +204,29 @@
 
             createPlayerHands() {
                 const skinMat = new THREE.MeshStandardMaterial({ color: 0xd2a679, roughness: 0.6 });
-
-                // Left Hand
                 this.leftArm = new THREE.Group();
-                const lMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.04, 0.4, 8), skinMat);
-                lMesh.rotation.x = Math.PI / 2.5;
+                const lMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.05, 0.5, 8), skinMat);
+                lMesh.rotation.x = Math.PI / 2.3;
                 this.leftArm.add(lMesh);
-                this.leftArm.position.set(-0.26, -0.25, -0.4);
+                this.leftArm.position.set(-0.35, -0.35, -0.45);
 
-                // Right Hand
                 this.rightArm = new THREE.Group();
-                const rMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.04, 0.4, 8), skinMat);
-                rMesh.rotation.x = Math.PI / 2.5;
+                const rMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.05, 0.5, 8), skinMat);
+                rMesh.rotation.x = Math.PI / 2.3;
                 this.rightArm.add(rMesh);
-                this.rightArm.position.set(0.26, -0.25, -0.4);
+                this.rightArm.position.set(0.35, -0.35, -0.45);
 
                 this.handsGroup.add(this.leftArm);
                 this.handsGroup.add(this.rightArm);
-
                 this.camera.add(this.handsGroup);
             }
 
             attachCrowbarToHand(crowbarMesh) {
                 if (this.heldItem) this.rightArm.remove(this.heldItem);
-                
                 const group = new THREE.Group();
-                crowbarMesh.scale.set(0.6, 0.6, 0.6);
+                crowbarMesh.scale.set(0.8, 0.8, 0.8);
                 crowbarMesh.rotation.set(Math.PI / 2, 0, Math.PI / 4);
                 crowbarMesh.position.set(0, 0.1, -0.1);
-                
                 group.add(crowbarMesh);
                 this.heldItem = group;
                 this.rightArm.add(this.heldItem);
@@ -331,11 +234,9 @@
 
             attachKeyToHand() {
                 if (this.heldItem) this.rightArm.remove(this.heldItem);
-
                 const keyMat = new THREE.MeshStandardMaterial({ color: 0xffcc00, metalness: 0.9 });
-                const keyMesh = new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.015, 8, 16), keyMat);
+                const keyMesh = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.02, 8, 16), keyMat);
                 keyMesh.position.set(0, 0.1, -0.1);
-
                 this.heldItem = keyMesh;
                 this.rightArm.add(this.heldItem);
             }
@@ -372,24 +273,16 @@
                             const dy = touch.clientY - joyStartPos.y;
                             const dist = Math.min(45, Math.hypot(dx, dy));
                             const angle = Math.atan2(dy, dx);
-
-                            const moveX = Math.cos(angle) * dist;
-                            const moveY = Math.sin(angle) * dist;
-
-                            joyStick.style.transform = `translate(calc(-50% + ${moveX}px), calc(-50% + ${moveY}px))`;
-                            this.moveInput.x = moveX / 45; 
-                            this.moveInput.y = -moveY / 45;
+                            joyStick.style.transform = `translate(calc(-50% + ${Math.cos(angle)*dist}px), calc(-50% + ${Math.sin(angle)*dist}px))`;
+                            this.moveInput.x = (Math.cos(angle)*dist) / 45; 
+                            this.moveInput.y = -(Math.sin(angle)*dist) / 45;
                         }
                     }
                 }, { passive: true });
 
                 const resetJoy = (e) => {
                     for (let touch of e.changedTouches) {
-                        if (touch.identifier === leftTouchId) {
-                            leftTouchId = null;
-                            joyBase.style.display = 'none';
-                            this.moveInput.set(0, 0);
-                        }
+                        if (touch.identifier === leftTouchId) { leftTouchId = null; joyBase.style.display = 'none'; this.moveInput.set(0, 0); }
                     }
                 };
                 window.addEventListener('touchend', resetJoy);
@@ -398,10 +291,7 @@
                 rightZone.addEventListener('touchstart', (e) => {
                     if (currentState !== STATES.PLAYING) return;
                     for (let touch of e.changedTouches) {
-                        if (rightTouchId === null) {
-                            rightTouchId = touch.identifier;
-                            lastRightPos = { x: touch.clientX, y: touch.clientY };
-                        }
+                        if (rightTouchId === null) { rightTouchId = touch.identifier; lastRightPos = { x: touch.clientX, y: touch.clientY }; }
                     }
                 }, { passive: true });
 
@@ -411,106 +301,89 @@
                         if (touch.identifier === rightTouchId) {
                             const dx = touch.clientX - lastRightPos.x;
                             const dy = touch.clientY - lastRightPos.y;
-
                             this.yaw -= dx * 0.005;
                             this.pitch -= dy * 0.005;
                             this.pitch = Math.max(-Math.PI/2.2, Math.min(Math.PI/2.2, this.pitch));
-
                             this.camera.rotation.order = "YXZ";
                             this.camera.rotation.y = this.yaw;
                             this.camera.rotation.x = this.pitch;
-
                             lastRightPos = { x: touch.clientX, y: touch.clientY };
                         }
                     }
                 }, { passive: true });
 
                 const resetRight = (e) => {
-                    for (let touch of e.changedTouches) {
-                        if (touch.identifier === rightTouchId) rightTouchId = null;
-                    }
+                    for (let touch of e.changedTouches) { if (touch.identifier === rightTouchId) rightTouchId = null; }
                 };
                 window.addEventListener('touchend', resetRight);
                 window.addEventListener('touchcancel', resetRight);
 
-                document.getElementById('btn-crouch').onclick = () => this.toggleCrouch();
+                document.getElementById('btn-crouch').onclick = () => {
+                    this.isCrouching = !this.isCrouching;
+                    this.targetHeight = this.isCrouching ? 1.0 : 2.0;
+                    document.getElementById('btn-crouch').innerText = this.isCrouching ? "STAND" : "SIT";
+                };
                 document.getElementById('btn-interact').onclick = () => game.interact();
-            }
-
-            toggleCrouch() {
-                this.isCrouching = !this.isCrouching;
-                this.targetHeight = this.isCrouching ? 0.8 : 1.6;
-                document.getElementById('btn-crouch').innerText = this.isCrouching ? "STAND" : "SIT";
             }
 
             update(delta, wallBoxes) {
                 if (currentState !== STATES.PLAYING) return;
-
                 this.camera.position.y += (this.targetHeight - this.camera.position.y) * delta * 12;
                 const speed = (this.isCrouching ? PLAYER_SPEED * 0.5 : PLAYER_SPEED) * delta;
-
                 const isMoving = Math.abs(this.moveInput.x) > 0.05 || Math.abs(this.moveInput.y) > 0.05;
 
                 if (isMoving) {
-                    const sinYaw = Math.sin(this.yaw);
-                    const cosYaw = Math.cos(this.yaw);
-
+                    const sinYaw = Math.sin(this.yaw), cosYaw = Math.cos(this.yaw);
                     const moveX = (this.moveInput.x * cosYaw - this.moveInput.y * sinYaw) * speed;
                     const moveZ = (-this.moveInput.x * sinYaw - this.moveInput.y * cosYaw) * speed;
 
                     this.camera.position.x += moveX;
                     if (this.checkWallCollision(wallBoxes)) this.camera.position.x -= moveX;
-
                     this.camera.position.z += moveZ;
                     if (this.checkWallCollision(wallBoxes)) this.camera.position.z -= moveZ;
 
-                    // Hand Walking Sway Animation
                     this.walkCycle += delta * 10;
-                    this.leftArm.position.y = -0.25 + Math.sin(this.walkCycle) * 0.02;
-                    this.rightArm.position.y = -0.25 - Math.sin(this.walkCycle) * 0.02;
+                    this.leftArm.position.y = -0.35 + Math.sin(this.walkCycle) * 0.03;
+                    this.rightArm.position.y = -0.35 - Math.sin(this.walkCycle) * 0.03;
                 }
             }
 
             checkWallCollision(wallBoxes) {
                 const playerBox = new THREE.Box3().setFromCenterAndSize(
-                    new THREE.Vector3(this.camera.position.x, this.camera.position.y - 0.4, this.camera.position.z),
-                    new THREE.Vector3(0.5, 1.2, 0.5)
+                    new THREE.Vector3(this.camera.position.x, this.camera.position.y - 0.5, this.camera.position.z),
+                    new THREE.Vector3(0.6, 1.4, 0.6)
                 );
-                for (let box of wallBoxes) {
-                    if (playerBox.intersectsBox(box)) return true;
-                }
+                for (let box of wallBoxes) { if (playerBox.intersectsBox(box)) return true; }
                 return false;
             }
 
             reset(spawnX, spawnZ) {
-                this.camera.position.set(spawnX, 1.6, spawnZ);
-                this.yaw = 0; this.pitch = 0; 
-                this.camera.rotation.set(0, 0, 0);
-                this.isCrouching = false; this.targetHeight = 1.6;
-                this.moveInput.set(0, 0);
+                this.camera.position.set(spawnX, 2.0, spawnZ);
+                this.yaw = 0; this.pitch = 0; this.camera.rotation.set(0, 0, 0);
+                this.isCrouching = false; this.targetHeight = 2.0; this.moveInput.set(0, 0);
             }
         }
 
+        // CORRECT ORIGINAL MAJA 3D MONSTER MODEL LINK
         class MajaEnemy {
             constructor(scene) {
                 this.scene = scene;
                 this.mesh = new THREE.Group();
                 this.scene.add(this.mesh);
-                
                 this.mixer = null;
-                this.speed = 3.6;
+                this.speed = 4.0;
                 this.isChasing = false;
                 this.patrolTarget = new THREE.Vector3();
 
-                this.load3DModel();
+                this.loadOriginalMajaModel();
                 this.chooseNewPatrolTarget();
             }
 
-            load3DModel() {
+            loadOriginalMajaModel() {
                 const loader = new THREE.GLTFLoader();
-                loader.load('https://files.catbox.moe/87o9ra.glb', (gltf) => {
+                loader.load('https://files.catbox.moe/gbxua4.glb', (gltf) => {
                     const model = gltf.scene;
-                    model.scale.set(1.2, 1.2, 1.2);
+                    model.scale.set(1.6, 1.6, 1.6);
                     model.position.y = 0;
                     this.mesh.add(model);
 
@@ -520,10 +393,9 @@
                         action.play();
                     }
                 }, undefined, () => {
-                    const bodyMat = new THREE.MeshStandardMaterial({ color: 0xaa0000 });
-                    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.5, 2.2), bodyMat);
-                    body.position.y = 1.1;
-                    this.mesh.add(body);
+                    const fallback = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 2.8), new THREE.MeshStandardMaterial({ color: 0xaa0000 }));
+                    fallback.position.y = 1.4;
+                    this.mesh.add(fallback);
                 });
             }
 
@@ -533,61 +405,47 @@
                 this.patrolTarget.set(randC * CELL_SIZE + CELL_SIZE/2, 0, randR * CELL_SIZE + CELL_SIZE/2);
             }
 
-            reset(x, z) {
-                this.mesh.position.set(x, 0, z);
-                this.isChasing = false;
-            }
+            reset(x, z) { this.mesh.position.set(x, 0, z); this.isChasing = false; }
 
             checkLineOfSight(playerPos, wallBoxes) {
                 const dir = new THREE.Vector3().subVectors(playerPos, this.mesh.position);
-                const dist = dir.length();
-                dir.normalize();
-
-                const raycaster = new THREE.Raycaster(this.mesh.position.clone().add(new THREE.Vector3(0, 1.5, 0)), dir, 0, dist);
-                for (let box of wallBoxes) {
-                    if (raycaster.ray.intersectsBox(box)) return false;
-                }
+                const dist = dir.length(); dir.normalize();
+                const raycaster = new THREE.Raycaster(this.mesh.position.clone().add(new THREE.Vector3(0, 1.8, 0)), dir, 0, dist);
+                for (let box of wallBoxes) { if (raycaster.ray.intersectsBox(box)) return false; }
                 return true;
             }
 
             update(delta, player, wallBoxes) {
                 if (currentState !== STATES.PLAYING) return;
-
                 if (this.mixer) this.mixer.update(delta);
 
                 const distToPlayer = this.mesh.position.distanceTo(player.camera.position);
                 const hasSight = this.checkLineOfSight(player.camera.position, wallBoxes);
 
-                if (distToPlayer < 14 && hasSight) {
-                    this.isChasing = true;
-                } else if (distToPlayer > 18 || !hasSight) {
-                    this.isChasing = false;
-                }
+                if (distToPlayer < 18 && hasSight) { this.isChasing = true; } 
+                else if (distToPlayer > 24 || !hasSight) { this.isChasing = false; }
 
                 const dangerInd = document.getElementById('danger-indicator');
                 if (this.isChasing) {
-                    const intensity = Math.max(0, 1 - distToPlayer / 14);
-                    dangerInd.style.boxShadow = `inset 0 0 ${intensity * 75}px rgba(255, 0, 0, ${intensity * 0.9})`;
+                    const intensity = Math.max(0, 1 - distToPlayer / 18);
+                    dangerInd.style.boxShadow = `inset 0 0 ${intensity * 80}px rgba(255, 0, 0, ${intensity * 0.9})`;
                     audio.setNearbyVolume(intensity);
                 } else {
                     dangerInd.style.boxShadow = `inset 0 0 0px rgba(255,0,0,0)`;
-                    audio.setNearbyVolume(Math.max(0, 1 - distToPlayer / 20) * 0.25);
+                    audio.setNearbyVolume(Math.max(0, 1 - distToPlayer / 25) * 0.2);
                 }
 
                 let destination = this.isChasing ? player.camera.position : this.patrolTarget;
-
-                if (this.mesh.position.distanceTo(this.patrolTarget) < 2.0 && !this.isChasing) {
+                if (this.mesh.position.distanceTo(this.patrolTarget) < 2.5 && !this.isChasing) {
                     this.chooseNewPatrolTarget();
                 }
 
                 const dir = new THREE.Vector3().subVectors(destination, this.mesh.position);
                 dir.y = 0; dir.normalize();
-
-                const nextPos = this.mesh.position.clone().add(dir.multiplyScalar(this.speed * delta));
-                this.mesh.position.copy(nextPos);
+                this.mesh.position.add(dir.multiplyScalar(this.speed * delta));
                 this.mesh.lookAt(destination.x, 0, destination.z);
 
-                if (distToPlayer < 1.6) game.triggerDeathCutscene();
+                if (distToPlayer < 1.8) game.triggerDeathCutscene();
             }
         }
 
@@ -596,14 +454,11 @@
                 this.grid = [];
                 this.wallBoxes = [];
                 this.exitGate = null;
-                
                 this.crowbar = null;
                 this.crowbarRawModel = null;
                 this.hasCrowbar = false;
-
                 this.boxes = [];
                 this.hasMainKey = false;
-                
                 this.activePromptObject = null;
 
                 this.initEngine();
@@ -618,23 +473,20 @@
 
             initEngine() {
                 scene = new THREE.Scene();
-                scene.background = new THREE.Color(0x020204);
+                scene.background = new THREE.Color(0x050508);
 
-                // FIXED NEAR CAMERA (PREVENTS WALL/CEILING GLITCHING)
-                camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.05, 100);
+                camera = new THREE.PerspectiveCamera(80, window.innerWidth / window.innerHeight, 0.1, 150);
                 scene.add(camera);
 
-                renderer = new THREE.WebGLRenderer({ antialias: false });
+                renderer = new THREE.WebGLRenderer({ antialias: true });
                 renderer.setSize(window.innerWidth, window.innerHeight);
                 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
                 document.getElementById('game-container').appendChild(renderer.domElement);
 
                 clock = new THREE.Clock();
 
-                const ambient = new THREE.AmbientLight(0xffffff, 1.2);
-                scene.add(ambient);
-
-                const flashLight = new THREE.SpotLight(0xffffff, 3.8, 38, Math.PI / 4, 0.4);
+                scene.add(new THREE.AmbientLight(0xffffff, 1.4));
+                const flashLight = new THREE.SpotLight(0xffffff, 4.0, 45, Math.PI / 3, 0.5);
                 camera.add(flashLight);
                 camera.add(flashLight.target);
                 flashLight.target.position.set(0, 0, -1);
@@ -647,179 +499,129 @@
             }
 
             initMaze() {
-                const gen = new MazeGenerator(MAZE_SIZE);
-                this.grid = gen.generate();
+                // SMOOTH TOILET HALL LAYOUT - NO BLOCKED PATHS
+                this.grid = [
+                    [1,1,1,1,1,1,1,1,1],
+                    [1,0,0,0,1,0,0,0,1],
+                    [1,0,1,0,0,0,1,0,1],
+                    [1,0,1,1,0,1,1,0,1],
+                    [1,0,0,0,0,0,0,0,1],
+                    [1,0,1,1,0,1,1,0,1],
+                    [1,0,1,0,0,0,1,0,1],
+                    [1,0,0,0,1,0,0,0,1],
+                    [1,1,1,1,1,1,1,1,1]
+                ];
 
-                // CLEAN WALL MATERIAL (REMOVED BLOOD)
-                const wallMatClean = new THREE.MeshStandardMaterial({ color: 0x333338, roughness: 0.8 });
-                const floorMat = new THREE.MeshStandardMaterial({ color: 0x151518, roughness: 0.9 });
+                const wallMat = new THREE.MeshStandardMaterial({ color: 0x42424d, roughness: 0.6 });
+                const floorMat = new THREE.MeshStandardMaterial({ color: 0x1f1f26, roughness: 0.9 });
+                const ceilingMat = new THREE.MeshStandardMaterial({ color: 0x2b2b36, roughness: 0.9 });
 
-                // Floor
-                const floor = new THREE.Mesh(
-                    new THREE.PlaneGeometry(MAZE_SIZE * CELL_SIZE, MAZE_SIZE * CELL_SIZE),
-                    floorMat
-                );
+                const floor = new THREE.Mesh(new THREE.PlaneGeometry(MAZE_SIZE * CELL_SIZE, MAZE_SIZE * CELL_SIZE), floorMat);
                 floor.rotation.x = -Math.PI / 2;
                 floor.position.set(MAZE_SIZE * CELL_SIZE / 2, 0, MAZE_SIZE * CELL_SIZE / 2);
                 scene.add(floor);
 
-                // Ceiling (Ceiling Fixed Above)
-                const ceilingMat = new THREE.MeshStandardMaterial({ color: 0x222225, roughness: 0.9 });
-                const ceiling = new THREE.Mesh(
-                    new THREE.PlaneGeometry(MAZE_SIZE * CELL_SIZE, MAZE_SIZE * CELL_SIZE),
-                    ceilingMat
-                );
+                const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(MAZE_SIZE * CELL_SIZE, MAZE_SIZE * CELL_SIZE), ceilingMat);
                 ceiling.rotation.x = Math.PI / 2;
                 ceiling.position.set(MAZE_SIZE * CELL_SIZE / 2, WALL_HEIGHT, MAZE_SIZE * CELL_SIZE / 2);
                 scene.add(ceiling);
 
                 const wallGeo = new THREE.BoxGeometry(CELL_SIZE, WALL_HEIGHT, CELL_SIZE);
-
                 for (let r = 0; r < MAZE_SIZE; r++) {
                     for (let c = 0; c < MAZE_SIZE; c++) {
                         if (this.grid[r][c] === 1) {
-                            const wall = new THREE.Mesh(wallGeo, wallMatClean);
-                            const x = c * CELL_SIZE + CELL_SIZE / 2;
-                            const z = r * CELL_SIZE + CELL_SIZE / 2;
-                            wall.position.set(x, WALL_HEIGHT / 2, z);
+                            const wall = new THREE.Mesh(wallGeo, wallMat);
+                            wall.position.set(c * CELL_SIZE + CELL_SIZE / 2, WALL_HEIGHT / 2, r * CELL_SIZE + CELL_SIZE / 2);
                             scene.add(wall);
-
-                            const box = new THREE.Box3().setFromObject(wall);
-                            this.wallBoxes.push(box);
+                            this.wallBoxes.push(new THREE.Box3().setFromObject(wall));
                         }
                     }
                 }
-
                 this.spawnObjects();
             }
 
             spawnObjects() {
                 const loader = new THREE.GLTFLoader();
 
-                // 1. CROWBAR MODEL
-                const cbX = 2.5 * CELL_SIZE;
-                const cbZ = 2.5 * CELL_SIZE;
+                // 1. CROWBAR
+                const cbX = 1.5 * CELL_SIZE, cbZ = 1.5 * CELL_SIZE;
                 const cbGroup = new THREE.Group();
-                cbGroup.position.set(cbX, 0.4, cbZ);
+                cbGroup.position.set(cbX, 0.5, cbZ);
                 scene.add(cbGroup);
+
+                const cbLight = new THREE.PointLight(0xffff00, 2, 8);
+                cbLight.position.set(cbX, 1.5, cbZ);
+                scene.add(cbLight);
 
                 loader.load('https://files.catbox.moe/fiualk.glb', (gltf) => {
                     const model = gltf.scene;
-                    model.scale.set(0.75, 0.75, 0.75);
+                    model.scale.set(1.2, 1.2, 1.2);
                     this.crowbarRawModel = model.clone();
                     cbGroup.add(model);
                 }, undefined, () => {
-                    const cbFallback = new THREE.Mesh(
-                        new THREE.CylinderGeometry(0.04, 0.04, 0.9, 8),
-                        new THREE.MeshStandardMaterial({ color: 0xaaaaaa, metalness: 0.9 })
-                    );
-                    cbFallback.rotation.z = Math.PI / 3;
-                    this.crowbarRawModel = cbFallback.clone();
-                    cbGroup.add(cbFallback);
+                    const fallback = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.2, 8), new THREE.MeshStandardMaterial({ color: 0xffcc00, metalness: 0.9 }));
+                    this.crowbarRawModel = fallback.clone();
+                    cbGroup.add(fallback);
                 });
-                
-                this.crowbar = { mesh: cbGroup, collected: false, pos: new THREE.Vector3(cbX, 0.4, cbZ) };
+                this.crowbar = { mesh: cbGroup, light: cbLight, collected: false, pos: new THREE.Vector3(cbX, 0.5, cbZ) };
 
                 // 2. CRATES & KEYS
-                const boxLocations = [
-                    { x: (MAZE_SIZE - 2.5) * CELL_SIZE, z: 2.5 * CELL_SIZE },
-                    { x: 2.5 * CELL_SIZE, z: (MAZE_SIZE - 2.5) * CELL_SIZE },
-                    { x: (MAZE_SIZE - 2.5) * CELL_SIZE, z: (MAZE_SIZE - 2.5) * CELL_SIZE }
+                const boxLocs = [
+                    { x: 7.5 * CELL_SIZE, z: 1.5 * CELL_SIZE },
+                    { x: 1.5 * CELL_SIZE, z: 7.5 * CELL_SIZE },
+                    { x: 7.5 * CELL_SIZE, z: 7.5 * CELL_SIZE }
                 ];
+                const realKeyIndex = Math.floor(Math.random() * boxLocs.length);
 
-                const realKeyIndex = Math.floor(Math.random() * boxLocations.length);
+                boxLocs.forEach((loc, index) => {
+                    const boxGroup = new THREE.Group();
+                    boxGroup.position.set(loc.x, 0.8, loc.z);
+                    scene.add(boxGroup);
 
-                loader.load('https://files.catbox.moe/365tnf.glb', (keyGltf) => {
                     loader.load('https://files.catbox.moe/ovpxen.glb', (boxGltf) => {
+                        const m = boxGltf.scene.clone();
+                        m.scale.set(1.4, 1.4, 1.4);
+                        boxGroup.add(m);
+                    }, undefined, () => {
+                        boxGroup.add(new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.5, 1.5), new THREE.MeshStandardMaterial({ color: 0x8b5a2b })));
+                    });
 
-                        boxLocations.forEach((loc, index) => {
-                            const isRealKey = (index === realKeyIndex);
+                    const keyGroup = new THREE.Group();
+                    keyGroup.position.set(loc.x, 0.8, loc.z);
+                    keyGroup.visible = false;
+                    scene.add(keyGroup);
 
-                            const boxGroup = new THREE.Group();
-                            boxGroup.position.set(loc.x, 0.6, loc.z);
-                            scene.add(boxGroup);
+                    loader.load('https://files.catbox.moe/365tnf.glb', (keyGltf) => {
+                        const m = keyGltf.scene.clone();
+                        m.scale.set(1.0, 1.0, 1.0);
+                        keyGroup.add(m);
+                    }, undefined, () => {
+                        keyGroup.add(new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.08, 8, 16), new THREE.MeshStandardMaterial({ color: 0xffcc00, metalness: 0.9 })));
+                    });
 
-                            const boxModel = boxGltf.scene.clone();
-                            boxModel.scale.set(0.85, 0.85, 0.85);
-                            boxGroup.add(boxModel);
+                    this.boxes.push({
+                        boxMesh: boxGroup, keyMesh: keyGroup, opened: false, keyPicked: false,
+                        isRealKey: (index === realKeyIndex), pos: new THREE.Vector3(loc.x, 0.8, loc.z)
+                    });
+                });
 
-                            const keyGroup = new THREE.Group();
-                            keyGroup.position.set(loc.x, 0.6, loc.z);
-                            keyGroup.visible = false;
-                            scene.add(keyGroup);
-
-                            const keyModel = keyGltf.scene.clone();
-                            keyModel.scale.set(0.65, 0.65, 0.65);
-                            keyGroup.add(keyModel);
-
-                            this.boxes.push({
-                                id: index,
-                                boxMesh: boxGroup,
-                                keyMesh: keyGroup,
-                                opened: false,
-                                keyPicked: false,
-                                isRealKey: isRealKey,
-                                pos: new THREE.Vector3(loc.x, 0.6, loc.z)
-                            });
-                        });
-
-                    }, undefined, () => this.setupBoxFallback(boxLocations, realKeyIndex));
-                }, undefined, () => this.setupBoxFallback(boxLocations, realKeyIndex));
-
-                // 3. MAIN EXIT GATE WITH LIGHT INDICATOR
-                const gateX = (MAZE_SIZE - 1.5) * CELL_SIZE;
-                const gateZ = (MAZE_SIZE - 1.5) * CELL_SIZE;
-
-                const gateMat = new THREE.MeshStandardMaterial({ color: 0x4a2a18, roughness: 0.5 });
-                const gate = new THREE.Mesh(new THREE.BoxGeometry(CELL_SIZE * 0.95, WALL_HEIGHT, 0.5), gateMat);
+                // 3. MAIN EXIT GATE
+                const gateX = 4.5 * CELL_SIZE, gateZ = 8.5 * CELL_SIZE;
+                const gate = new THREE.Mesh(new THREE.BoxGeometry(CELL_SIZE * 0.9, WALL_HEIGHT, 0.8), new THREE.MeshStandardMaterial({ color: 0x4a2a18 }));
                 gate.position.set(gateX, WALL_HEIGHT/2, gateZ);
                 scene.add(gate);
 
-                // GLOW BEACON AT GATE
-                const gateLight = new THREE.PointLight(0xffaa00, 3.5, 25);
-                gateLight.position.set(gateX, WALL_HEIGHT - 0.5, gateZ);
+                const gateLight = new THREE.PointLight(0x00ffcc, 4, 30);
+                gateLight.position.set(gateX, WALL_HEIGHT - 1.0, gateZ);
                 scene.add(gateLight);
 
-                const gateBox = new THREE.Box3().setFromObject(gate);
-                this.wallBoxes.push(gateBox);
-
+                this.wallBoxes.push(new THREE.Box3().setFromObject(gate));
                 this.exitGate = { mesh: gate, open: false, light: gateLight };
-            }
-
-            setupBoxFallback(boxLocations, realKeyIndex) {
-                if (this.boxes.length > 0) return;
-                boxLocations.forEach((loc, index) => {
-                    const isRealKey = (index === realKeyIndex);
-
-                    const boxGroup = new THREE.Group();
-                    boxGroup.position.set(loc.x, 0.6, loc.z);
-                    const crateGeom = new THREE.BoxGeometry(1.2, 1.2, 1.2);
-                    const crateMat = new THREE.MeshStandardMaterial({ color: 0x8b5a2b, roughness: 0.8 });
-                    boxGroup.add(new THREE.Mesh(crateGeom, crateMat));
-                    scene.add(boxGroup);
-
-                    const keyGroup = new THREE.Group();
-                    keyGroup.position.set(loc.x, 0.6, loc.z);
-                    keyGroup.visible = false;
-                    const keyMat = new THREE.MeshStandardMaterial({ color: 0xffcc00, metalness: 0.9 });
-                    keyGroup.add(new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.05, 8, 16), keyMat));
-                    scene.add(keyGroup);
-
-                    this.boxes.push({
-                        id: index,
-                        boxMesh: boxGroup,
-                        keyMesh: keyGroup,
-                        opened: false,
-                        keyPicked: false,
-                        isRealKey: isRealKey,
-                        pos: new THREE.Vector3(loc.x, 0.6, loc.z)
-                    });
-                });
             }
 
             resetGamePositions() {
                 this.player.reset(1.5 * CELL_SIZE, 1.5 * CELL_SIZE);
-                this.maja.reset(3.5 * CELL_SIZE, 3.5 * CELL_SIZE);
+                this.maja.reset(4.5 * CELL_SIZE, 4.5 * CELL_SIZE);
             }
 
             setupUI() {
@@ -833,33 +635,26 @@
             showDayCutscene(day) {
                 currentState = STATES.CUTSCENE;
                 dayCount = day;
-
                 const dayScr = document.getElementById('day-screen');
                 dayScr.innerText = `DAY ${day}`;
                 dayScr.style.display = 'flex';
-
-                setTimeout(() => {
-                    dayScr.style.display = 'none';
-                    currentState = STATES.PLAYING;
-                }, 1800);
+                setTimeout(() => { dayScr.style.display = 'none'; currentState = STATES.PLAYING; }, 1800);
             }
 
             checkInteractions() {
                 const btnInteract = document.getElementById('btn-interact');
                 const prompt = document.getElementById('interaction-prompt');
-
                 let canInteract = false;
                 this.activePromptObject = null;
 
-                if (!this.crowbar.collected && camera.position.distanceTo(this.crowbar.pos) < 3.0) {
+                if (!this.crowbar.collected && camera.position.distanceTo(this.crowbar.pos) < 4.0) {
                     canInteract = true;
                     this.activePromptObject = { type: 'crowbar' };
                     prompt.innerText = "PICK UP CROWBAR";
                     btnInteract.innerText = "TAKE";
-                }
-                else {
+                } else {
                     for (let boxObj of this.boxes) {
-                        if (camera.position.distanceTo(boxObj.pos) < 3.2) {
+                        if (camera.position.distanceTo(boxObj.pos) < 4.0) {
                             if (!boxObj.opened) {
                                 if (this.hasCrowbar) {
                                     canInteract = true;
@@ -875,7 +670,7 @@
                             } else if (!boxObj.keyPicked) {
                                 canInteract = true;
                                 this.activePromptObject = { type: 'key', target: boxObj };
-                                prompt.innerText = boxObj.isRealKey ? "TAKE REAL MAIN EXIT KEY!" : "TAKE KEY";
+                                prompt.innerText = boxObj.isRealKey ? "TAKE REAL EXIT KEY!" : "TAKE FAKE KEY";
                                 btnInteract.innerText = "KEY";
                             }
                             break;
@@ -883,14 +678,14 @@
                     }
                 }
 
-                if (!this.exitGate.open && camera.position.distanceTo(this.exitGate.mesh.position) < 3.5) {
+                if (!this.exitGate.open && camera.position.distanceTo(this.exitGate.mesh.position) < 4.5) {
                     if (this.hasMainKey) {
                         canInteract = true;
                         this.activePromptObject = { type: 'gate' };
-                        prompt.innerText = "UNLOCK MAIN GATE";
+                        prompt.innerText = "UNLOCK EXIT GATE & ESCAPE";
                         btnInteract.innerText = "OPEN";
                     } else {
-                        prompt.innerText = "GATE LOCKED! (FIND REAL KEY IN CRATES)";
+                        prompt.innerText = "MAIN GATE LOCKED! FIND KEY IN CRATES.";
                         prompt.style.display = 'block';
                         btnInteract.style.display = 'none';
                         return;
@@ -906,26 +701,20 @@
 
                 if (this.activePromptObject.type === 'crowbar') {
                     this.crowbar.collected = true;
-                    scene.remove(this.crowbar.mesh);
+                    scene.remove(this.crowbar.mesh); scene.remove(this.crowbar.light);
                     this.hasCrowbar = true;
-                    
-                    if (this.crowbarRawModel) {
-                        this.player.attachCrowbarToHand(this.crowbarRawModel);
-                    }
+                    if (this.crowbarRawModel) this.player.attachCrowbarToHand(this.crowbarRawModel);
                     audio.playCrowbar();
-                }
-                else if (this.activePromptObject.type === 'box') {
+                } else if (this.activePromptObject.type === 'box') {
                     const boxObj = this.activePromptObject.target;
                     boxObj.opened = true;
                     scene.remove(boxObj.boxMesh);
                     boxObj.keyMesh.visible = true;
                     audio.playBoxBreak();
-                }
-                else if (this.activePromptObject.type === 'key') {
+                } else if (this.activePromptObject.type === 'key') {
                     const boxObj = this.activePromptObject.target;
                     boxObj.keyPicked = true;
                     scene.remove(boxObj.keyMesh);
-
                     if (boxObj.isRealKey) {
                         this.hasMainKey = true;
                         this.player.attachKeyToHand();
@@ -933,15 +722,12 @@
                     } else {
                         audio.playKeyPickup();
                         const prompt = document.getElementById('interaction-prompt');
-                        prompt.innerText = "FAKE KEY! FIND OTHER CRATES!";
+                        prompt.innerText = "FAKE KEY! CHECK OTHER CRATES!";
                         prompt.style.display = 'block';
                     }
-                }
-                else if (this.activePromptObject.type === 'gate') {
+                } else if (this.activePromptObject.type === 'gate') {
                     this.exitGate.open = true;
-                    scene.remove(this.exitGate.mesh);
-                    scene.remove(this.exitGate.light);
-
+                    scene.remove(this.exitGate.mesh); scene.remove(this.exitGate.light);
                     currentState = STATES.VICTORY;
                     document.getElementById('victory-screen').style.display = 'flex';
                 }
@@ -950,13 +736,11 @@
             triggerDeathCutscene() {
                 currentState = STATES.CUTSCENE;
                 audio.playJumpscare();
-
                 const jumpscare = document.getElementById('jumpscare-overlay');
                 jumpscare.style.display = 'flex';
 
                 setTimeout(() => {
                     jumpscare.style.display = 'none';
-
                     if (dayCount < 3) {
                         this.resetGamePositions();
                         this.showDayCutscene(dayCount + 1);
@@ -969,7 +753,6 @@
 
             animate() {
                 requestAnimationFrame(() => this.animate());
-
                 const delta = clock.getDelta();
 
                 if (currentState === STATES.PLAYING) {
@@ -977,17 +760,9 @@
                     this.maja.update(delta, this.player, this.wallBoxes);
                     this.checkInteractions();
 
-                    if (!this.crowbar.collected) {
-                        this.crowbar.mesh.rotation.y += delta * 1.5;
-                    }
-
-                    this.boxes.forEach(b => {
-                        if (b.opened && !b.keyPicked) {
-                            b.keyMesh.rotation.y += delta * 2;
-                        }
-                    });
+                    if (!this.crowbar.collected) this.crowbar.mesh.rotation.y += delta * 1.5;
+                    this.boxes.forEach(b => { if (b.opened && !b.keyPicked) b.keyMesh.rotation.y += delta * 2; });
                 }
-
                 renderer.render(scene, camera);
             }
         }
