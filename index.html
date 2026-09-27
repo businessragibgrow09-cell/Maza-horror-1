@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>3D Maja Horror Escape - Perfectly Fixed</title>
+    <style>
+        * {
+            margin: 0; padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+        body, html {
+            width: 100%; height: 100%;
+            overflow: hidden;
+            background-color: #000;
+            font-family: Arial, sans-serif;
+        }
+        #game-container {
+            width: 100%; height: 100%; position: relative;
+        }
+        canvas { width: 100%; height: 100%; display: block; }
+
+        #crosshair {
+            position: absolute; top: 50%; left: 50%;
+            width: 8px; height: 8px;
+            background: #ff2222; border-radius: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none; z-index: 10;
+            box-shadow: 0 0 8px #ff0000;
+        }
+
+        #touch-zone-left, #touch-zone-right {
+            position: absolute; bottom: 0;
+            width: 50%; height: 80%; z-index: 12;
+        }
+        #touch-zone-left { left: 0; }
+        #touch-zone-right { right: 0; }
+
+        #joystick-base {
+            position: absolute; width: 110px; height: 110px;
+            background: rgba(255, 255, 255, 0.15);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%; display: none;
+            pointer-events: none; z-index: 13;
+            transform: translate(-50%, -50%);
+        }
+        #joystick-stick {
+            position: absolute; width: 45px; height: 45px;
+            background: #ff2222; border-radius: 50%;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .action-btn {
+            position: absolute; z-index: 14;
+            background: rgba(0, 0, 0, 0.85);
+            border: 2px solid #fff; color: #fff;
+            border-radius: 50%; font-weight: bold; font-size: 0.85rem;
+            display: flex; justify-content: center; align-items: center;
+        }
+        #btn-crouch { bottom: 30px; right: 25px; width: 65px; height: 65px; background: rgba(0, 80, 180, 0.8); }
+        #btn-interact { bottom: 30px; right: 105px; width: 75px; height: 75px; border-color: #ffcc00; color: #ffcc00; display: none; background: rgba(0,0,0,0.9); }
+
+        .overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(4, 4, 6, 0.95);
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            color: #fff; z-index: 20; text-align: center; padding: 20px;
+        }
+
+        .title { font-size: 2.2rem; color: #ff2222; text-shadow: 0 0 15px #ff0000; margin-bottom: 12px; }
+        .subtitle { font-size: 0.95rem; color: #bbb; margin-bottom: 22px; line-height: 1.6; }
+        .btn { padding: 12px 28px; font-size: 1rem; background: #111; color: #ff2222; border: 2px solid #ff2222; font-weight: bold; border-radius: 8px; cursor: pointer; }
+
+        #interaction-prompt {
+            position: absolute; top: 38%; left: 50%; transform: translate(-50%, -50%);
+            color: #ffea00; font-size: 1rem; font-weight: bold;
+            z-index: 10; pointer-events: none; display: none; background: rgba(0,0,0,0.9);
+            padding: 10px 22px; border-radius: 20px; border: 1.5px solid #ffea00;
+            text-align: center;
+        }
+
+        #danger-indicator {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 9; transition: box-shadow 0.2s;
+        }
+
+        #jumpscare-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(180, 0, 0, 0.9);
+            z-index: 35; display: none; flex-direction: column;
+            justify-content: center; align-items: center;
+            animation: flash 0.12s infinite alternate;
+        }
+        #jumpscare-text { color: #fff; font-size: 2.6rem; font-weight: 900; }
+
+        @keyframes flash {
+            0% { background: rgba(255, 0, 0, 0.95); }
+            100% { background: rgba(30, 0, 0, 0.98); }
+        }
+
+        #day-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; color: #ff2222; display: flex; justify-content: center; align-items: center;
+            font-size: 3.8rem; font-weight: bold; z-index: 25; display: none;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+</head>
+<body>
+
+    <div id="game-container">
+        <div id="crosshair"></div>
+        <div id="danger-indicator"></div>
+
+        <div id="jumpscare-overlay">
+            <div id="jumpscare-text">MAJA CAUGHT YOU!</div>
+        </div>
+
+        <div id="day-screen">DAY 1</div>
+        <div id="interaction-prompt">PRESS TO INTERACT</div>
+
+        <div id="touch-zone-left"></div>
+        <div id="touch-zone-right"></div>
+        <div id="joystick-base"><div id="joystick-stick"></div></div>
+
+        <div class="action-btn" id="btn-crouch">SIT</div>
+        <div class="action-btn" id="btn-interact">USE</div>
+
+        <div id="start-screen" class="overlay">
+            <h1 class="title">MAJA HORROR ESCAPE</h1>
+            <p class="subtitle">
+                1. Pick up Crowbar<br>
+                2. Break Crates & Find REAL Exit Key<br>
+                3. Follow Glowing Gate Light & Escape!
+            </p>
+            <button class="btn" id="start-btn">START GAME</button>
+        </div>
+
+        <div id="victory-screen" class="overlay" style="display: none;">
+            <h1 class="title" style="color: #00ff66;">YOU ESCAPED!</h1>
+            <button class="btn" onclick="location.reload()">PLAY AGAIN</button>
+        </div>
+
+        <div id="death-screen" class="overlay" style="display: none;">
+            <h1 class="title">GAME OVER</h1>
+            <button class="btn" onclick="location.reload()">TRY AGAIN</button>
+        </div>
+    </div>
+
+    <script>
+        const MAZE_SIZE = 13;
+        const CELL_SIZE = 6.0;
+        const WALL_HEIGHT = 4.0;
+        const PLAYER_SPEED = 7.0;
+
+        const STATES = { MENU: 0, PLAYING: 1, CUTSCENE: 2, DEAD: 3, VICTORY: 4 };
+        let currentState = STATES.MENU;
+
+        let scene, camera, renderer, clock;
+        let dayCount = 1;
+
+        class SoundEngine {
+            constructor() {
+                this.bgMusic = new Audio('https://files.catbox.moe/t1l55y');
+                this.bgMusic.loop = true;
+                this.bgMusic.volume = 0.4;
+
+                this.monsterNearbySound = new Audio('https://files.catbox.moe/dfmfqq');
+                this.monsterNearbySound.loop = true;
+                this.monsterNearbySound.volume = 0;
+
+                this.sndCrowbar = new Audio('https://files.catbox.moe/m5zp5k.mp3');
+                this.sndBoxBreak = new Audio('https://files.catbox.moe/3gar1e.mp3');
+                this.sndKeyPickup = new Audio('https://files.catbox.moe/oaj33c.mp3');
+                this.sndJumpscare = new Audio('https://files.catbox.moe/3mbkym.mp3');
+            }
+
+            playBgMusic() {
+                this.bgMusic.play().catch(()=>{});
+                this.monsterNearbySound.play().catch(()=>{});
+            }
+
+            setNearbyVolume(vol) {
+                this.monsterNearbySound.volume = Math.min(1.0, Math.max(0, vol));
+            }
+
+            playCrowbar() { this.sndCrowbar.currentTime = 0; this.sndCrowbar.play().catch(()=>{}); }
+            playBoxBreak() { this.sndBoxBreak.currentTime = 0; this.sndBoxBreak.play().catch(()=>{}); }
+            playKeyPickup() { this.sndKeyPickup.currentTime = 0; this.sndKeyPickup.play().catch(()=>{}); }
+            playJumpscare() { this.sndJumpscare.currentTime = 0; this.sndJumpscare.play().catch(()=>{}); }
+        }
+        const audio = new SoundEngine();
+
+        class MazeGenerator {
+            constructor(size) {
+                this.size = size;
+                this.grid = Array(size).fill(null).map(() => Array(size).fill(1));
+            }
+            generate() {
+                const stack = [];
+                this.grid[1][1] = 0;
+                stack.push([1, 1]);
+
+                while (stack.length > 0) {
+                    const [r, c] = stack[stack.length - 1];
+                    const neighbors = [];
+                    const dirs = [[-2, 0], [2, 0], [0, -2], [0, 2]];
+
+                    for (let [dr, dc] of dirs) {
+                        const nr = r + dr, nc = c + dc;
+                        if (nr > 0 && nr < this.size - 1 && nc > 0 && nc < this.size - 1 && this.grid[nr][nc] === 1) {
+                            neighbors.push([nr, nc, dr, dc]);
+                        }
+                    }
+
+                    if (neighbors.length > 0) {
+                        const [nr, nc, dr, dc] = neighbors[Math.floor(Math.random() * neighbors.length)];
+                        this.grid[r + dr / 2][c + dc / 2] = 0;
+                        this.grid[nr][nc] = 0;
+                        stack.push([nr, nc]);
+                    } else {
+                        stack.pop();
+                    }
+                }
+                return this.grid;
+            }
+        }
+
+        class MobilePlayerController {
+            constructor(camera) {
+                this.camera = camera;
+                this.moveInput = new THREE.Vector2(0, 0);
+                this.isCrouching = false;
+                this.pitch = 0; this.yaw = 0;
+                this.targetHeight = 1.6;
+                this.heldItemMesh = null;
+                this.setupInputs();
+            }
+
+            holdItemInHand(type) {
+                if (this.heldItemMesh) this.camera.remove(this.heldItemMesh);
+                const group = new THREE.Group();
+
+                if (type === 'crowbar') {
+                    const mat = new THREE.MeshStandardMaterial({ color: 0x555555, metalness: 0.8 });
+                    const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.55, 8), mat);
+                    bar.rotation.z = Math.PI / 3;
+                    group.add(bar);
+                } else if (type === 'key') {
+                    const mat = new THREE.MeshStandardMaterial({ color: 0xffcc00, metalness: 0.9 });
+                    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.015, 8, 16), mat);
+                    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.18, 8), mat);
+                    stem.rotation.z = Math.PI / 2; stem.position.x = 0.08;
+                    group.add(ring); group.add(stem);
+                }
+
+                group.position.set(0.28, -0.22, -0.45);
+                this.heldItemMesh = group;
+                this.camera.add(this.heldItemMesh);
+            }
+
+            setupInputs() {
+                const leftZone = document.getElementById('touch-zone-left');
+                const rightZone = document.getElementById('touch-zone-right');
+                const joyBase = document.getElementById('joystick-base');
+                const joyStick = document.getElementById('joystick-stick');
+                
+                let leftTouchId = null, rightTouchId = null;
+                let joyStartPos = { x: 0, y: 0 };
+                let lastRightPos = { x: 0, y: 0 };
+
+                leftZone.addEventListener('touchstart', (e) => {
+                    if (currentState !== STATES.PLAYING) return;
+                    for (let touch of e.changedTouches) {
+                        if (leftTouchId === null) {
+                            leftTouchId = touch.identifier;
+                            joyStartPos = { x: touch.clientX, y: touch.clientY };
+                            joyBase.style.left = joyStartPos.x + 'px';
+                            joyBase.style.top = joyStartPos.y + 'px';
+                            joyBase.style.display = 'block';
+                            this.moveInput.set(0, 0);
+                        }
+                    }
+                }, { passive: true });
+
+                window.addEventListener('touchmove', (e) => {
+                    if (currentState !== STATES.PLAYING) return;
+                    for (let touch of e.changedTouches) {
+                        if (touch.identifier === leftTouchId) {
+                            const dx = touch.clientX - joyStartPos.x;
+                            const dy = touch.clientY - joyStartPos.y;
+                            const dist = Math.min(45, Math.hypot(dx, dy));
+                            const angle = Math.atan2(dy, dx);
+
+                            const moveX = Math.cos(angle) * dist;
+                            const moveY = Math.sin(angle) * dist;
+
+                            joyStick.style.transform = `translate(calc(-50% + ${moveX}px), calc(-50% + ${moveY}px))`;
+                            this.moveInput.x = moveX / 45; 
+                            this.moveInput.y = -moveY / 45;
+                        }
+                    }
+                }, { passive: true });
+
+                const resetJoy = (e) => {
+                    for (let touch of e.changedTouches) {
+                        if (touch.identifier === leftTouchId) {
+                            leftTouchId = null;
+                            joyBase.style.display = 'none';
+                            this.moveInput.set(0, 0);
+                        }
+                    }
+                };
+                window.addEventListener('touchend', resetJoy);
+                window.addEventListener('touchcancel', resetJoy);
+
+                rightZone.addEventListener('touchstart', (e) => {
+                    if (currentState !== STATES.PLAYING) return;
+                    for (let touch of e.changedTouches) {
+                        if (rightTouchId === null) {
+                            rightTouchId = touch.identifier;
+                            lastRightPos = { x: touch.clientX, y: touch.clientY };
+                        }
+                    }
+                }, { passive: true });
+
+                rightZone.addEventListener('touchmove', (e) => {
+                    if (currentState !== STATES.PLAYING) return;
+                    for (let touch of e.changedTouches) {
+                        if (touch.identifier === rightTouchId) {
+                            const dx = touch.clientX - lastRightPos.x;
+                            const dy = touch.clientY - lastRightPos.y;
+
+                            this.yaw -= dx * 0.005;
+                            this.pitch -= dy * 0.005;
+                            this.pitch = Math.max(-Math.PI/2.2, Math.min(Math.PI/2.2, this.pitch));
+
+                            this.camera.rotation.order = "YXZ";
+                            this.camera.rotation.y = this.yaw;
+                            this.camera.rotation.x = this.pitch;
+
+                            lastRightPos = { x: touch.clientX, y: touch.clientY };
+                        }
+                    }
+                }, { passive: true });
+
+                const resetRight = (e) => {
+                    for (let touch of e.changedTouches) {
+                        if (touch.identifier === rightTouchId) rightTouchId = null;
+                    }
+                };
+                window.addEventListener('touchend', resetRight);
+                window.addEventListener('touchcancel', resetRight);
+
+                document.getElementById('btn-crouch').onclick = () => this.toggleCrouch();
+                document.getElementById('btn-interact').onclick = () => game.interact();
+            }
+
+            toggleCrouch() {
+                this.isCrouching = !this.isCrouching;
+                this.targetHeight = this.isCrouching ? 0.8 : 1.6;
+                document.getElementById('btn-crouch').innerText = this.isCrouching ? "STAND" : "SIT";
+            }
+
+            update(delta, wallBoxes) {
+                if (currentState !== STATES.PLAYING) return;
+
+                this.camera.position.y += (this.targetHeight - this.camera.position.y) * delta * 12;
+                const speed = (this.isCrouching ? PLAYER_SPEED * 0.5 : PLAYER_SPEED) * delta;
+
+                if (Math.abs(this.moveInput.x) > 0.05 || Math.abs(this.moveInput.y) > 0.05) {
+                    const sinYaw = Math.sin(this.yaw);
+                    const cosYaw = Math.cos(this.yaw);
+
+                    const moveX = (this.moveInput.x * cosYaw - this.moveInput.y * sinYaw) * speed;
+                    const moveZ = (-this.moveInput.x * sinYaw - this.moveInput.y * cosYaw) * speed;
+
+                    this.camera.position.x += moveX;
+                    if (this.checkWallCollision(wallBoxes)) this.camera.position.x -= moveX;
+
+                    this.camera.position.z += moveZ;
+                    if (this.checkWallCollision(wallBoxes)) this.camera.position.z -= moveZ;
+                }
+            }
+
+            checkWallCollision(wallBoxes) {
+                const playerBox = new THREE.Box3().setFromCenterAndSize(
+                    new THREE.Vector3(this.camera.position.x, this.camera.position.y - 0.4, this.camera.position.z),
+                    new THREE.Vector3(0.6, 1.2, 0.6)
+                );
+                for (let box of wallBoxes) {
+                    if (playerBox.intersectsBox(box)) return true;
+                }
+                return false;
+            }
+
+            reset(spawnX, spawnZ) {
+                this.camera.position.set(spawnX, 1.6, spawnZ);
+                this.yaw = 0; this.pitch = 0; 
+                this.camera.rotation.set(0, 0, 0);
+                this.isCrouching = false; this.targetHeight = 1.6;
+                this.moveInput.set(0, 0);
+            }
+        }
+
+        class MajaEnemy {
+            constructor(scene) {
+                this.scene = scene;
+                this.mesh = new THREE.Group();
+                this.scene.add(this.mesh);
+                
+                this.mixer = null;
+                this.speed = 3.5;
+                this.isChasing = false;
+                this.patrolTarget = new THREE.Vector3();
+
+                this.load3DModel();
+                this.chooseNewPatrolTarget();
+            }
+
+            load3DModel() {
+                const loader = new THREE.GLTFLoader();
+                loader.load('https://files.catbox.moe/87o9ra.glb', (gltf) => {
+                    const model = gltf.scene;
+                    model.scale.set(1.2, 1.2, 1.2);
+                    model.position.y = 0;
+                    this.mesh.add(model);
+
+                    if (gltf.animations && gltf.animations.length > 0) {
+                        this.mixer = new THREE.AnimationMixer(model);
+                        const action = this.mixer.clipAction(gltf.animations[0]);
+                        action.play();
+                    }
+                }, undefined, () => {
+                    // Fallback Body
+                    const bodyMat = new THREE.MeshStandardMaterial({ color: 0xaa0000 });
+                    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.5, 2.2), bodyMat);
+                    body.position.y = 1.1;
+                    this.mesh.add(body);
+                });
+            }
+
+            chooseNewPatrolTarget() {
+                const randR = Math.floor(Math.random() * (MAZE_SIZE - 2)) + 1;
+                const randC = Math.floor(Math.random() * (MAZE_SIZE - 2)) + 1;
+                this.patrolTarget.set(randC * CELL_SIZE + CELL_SIZE/2, 0, randR * CELL_SIZE + CELL_SIZE/2);
+            }
+
+            reset(x, z) {
+                this.mesh.position.set(x, 0, z);
+                this.isChasing = false;
+            }
+
+            checkLineOfSight(playerPos, wallBoxes) {
+                const dir = new THREE.Vector3().subVectors(playerPos, this.mesh.position);
+                const dist = dir.length();
+                dir.normalize();
+
+                const raycaster = new THREE.Raycaster(this.mesh.position.clone().add(new THREE.Vector3(0, 1.5, 0)), dir, 0, dist);
+                for (let box of wallBoxes) {
+                    if (raycaster.ray.intersectsBox(box)) return false;
+                }
+                return true;
+            }
+
+            update(delta, player, wallBoxes) {
+                if (currentState !== STATES.PLAYING) return;
+
+                if (this.mixer) this.mixer.update(delta);
+
+                const distToPlayer = this.mesh.position.distanceTo(player.camera.position);
+                const hasSight = this.checkLineOfSight(player.camera.position, wallBoxes);
+
+                if (distToPlayer < 14 && hasSight) {
+                    this.isChasing = true;
+                } else if (distToPlayer > 18 || !hasSight) {
+                    this.isChasing = false;
+                }
+
+                const dangerInd = document.getElementById('danger-indicator');
+                if (this.isChasing) {
+                    const intensity = Math.max(0, 1 - distToPlayer / 14);
+                    dangerInd.style.boxShadow = `inset 0 0 ${intensity * 75}px rgba(255, 0, 0, ${intensity * 0.9})`;
+                    audio.setNearbyVolume(intensity);
+                } else {
+                    dangerInd.style.boxShadow = `inset 0 0 0px rgba(255,0,0,0)`;
+                    audio.setNearbyVolume(Math.max(0, 1 - distToPlayer / 20) * 0.25);
+                }
+
+                let destination = this.isChasing ? player.camera.position : this.patrolTarget;
+
+                if (this.mesh.position.distanceTo(this.patrolTarget) < 2.0 && !this.isChasing) {
+                    this.chooseNewPatrolTarget();
+                }
+
+                const dir = new THREE.Vector3().subVectors(destination, this.mesh.position);
+                dir.y = 0; dir.normalize();
+
+                const nextPos = this.mesh.position.clone().add(dir.multiplyScalar(this.speed * delta));
+                this.mesh.position.copy(nextPos);
+                this.mesh.lookAt(destination.x, 0, destination.z);
+
+                if (distToPlayer < 1.6) game.triggerDeathCutscene();
+            }
+        }
+
+        class Game {
+            constructor() {
+                this.grid = [];
+                this.wallBoxes = [];
+                this.exitGate = null;
+                
+                this.crowbar = null;
+                this.hasCrowbar = false;
+
+                this.boxes = [];
+                this.hasMainKey = false;
+                
+                this.activePromptObject = null;
+
+                this.initEngine();
+                this.initMaze();
+                this.player = new MobilePlayerController(camera);
+                this.maja = new MajaEnemy(scene);
+
+                this.resetGamePositions();
+                this.setupUI();
+                this.animate();
+            }
+
+            createBloodSplatterTexture() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 512; canvas.height = 512;
+                const ctx = canvas.getContext('2d');
+
+                ctx.fillStyle = '#222225';
+                ctx.fillRect(0, 0, 512, 512);
+
+                for (let i = 0; i < 2000; i++) {
+                    ctx.fillStyle = `rgba(255, 255, 255, ${Math.random() * 0.04})`;
+                    ctx.fillRect(Math.random() * 512, Math.random() * 512, 2, 2);
+                }
+
+                // Blood Splatters
+                for (let s = 0; s < 12; s++) {
+                    let centerX = Math.random() * 512;
+                    let centerY = Math.random() * 512;
+
+                    ctx.fillStyle = '#8b0000';
+                    ctx.beginPath();
+                    ctx.arc(centerX, centerY, Math.random() * 15 + 5, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    for (let d = 0; d < 6; d++) {
+                        ctx.strokeStyle = '#550000';
+                        ctx.lineWidth = Math.random() * 3 + 1;
+                        ctx.beginPath();
+                        ctx.moveTo(centerX, centerY);
+                        ctx.lineTo(centerX + (Math.random() - 0.5) * 30, centerY + Math.random() * 60 + 10);
+                        ctx.stroke();
+                    }
+                }
+
+                return new THREE.CanvasTexture(canvas);
+            }
+
+            initEngine() {
+                scene = new THREE.Scene();
+                scene.background = new THREE.Color(0x020204);
+
+                // CAMERA NEAR PLANE FIXED AT 0.05 (PREVENTS CEILING/WALL GLITCH)
+                camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.05, 100);
+                scene.add(camera);
+
+                renderer = new THREE.WebGLRenderer({ antialias: false });
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+                document.getElementById('game-container').appendChild(renderer.domElement);
+
+                clock = new THREE.Clock();
+
+                const ambient = new THREE.AmbientLight(0xffffff, 1.2);
+                scene.add(ambient);
+
+                const flashLight = new THREE.SpotLight(0xffffff, 3.8, 38, Math.PI / 4, 0.4);
+                camera.add(flashLight);
+                camera.add(flashLight.target);
+                flashLight.target.position.set(0, 0, -1);
+
+                window.addEventListener('resize', () => {
+                    camera.aspect = window.innerWidth / window.innerHeight;
+                    camera.updateProjectionMatrix();
+                    renderer.setSize(window.innerWidth, window.innerHeight);
+                });
+            }
+
+            initMaze() {
+                const gen = new MazeGenerator(MAZE_SIZE);
+                this.grid = gen.generate();
+
+                const bloodTex = this.createBloodSplatterTexture();
+                bloodTex.wrapS = THREE.RepeatWrapping;
+                bloodTex.wrapT = THREE.RepeatWrapping;
+
+                const wallMatBlood = new THREE.MeshStandardMaterial({ map: bloodTex, roughness: 0.8 });
+                const floorMat = new THREE.MeshStandardMaterial({ color: 0x151518, roughness: 0.9 });
+
+                // Floor
+                const floor = new THREE.Mesh(
+                    new THREE.PlaneGeometry(MAZE_SIZE * CELL_SIZE, MAZE_SIZE * CELL_SIZE),
+                    floorMat
+                );
+                floor.rotation.x = -Math.PI / 2;
+                floor.position.set(MAZE_SIZE * CELL_SIZE / 2, 0, MAZE_SIZE * CELL_SIZE / 2);
+                scene.add(floor);
+
+                const wallGeo = new THREE.BoxGeometry(CELL_SIZE, WALL_HEIGHT, CELL_SIZE);
+
+                for (let r = 0; r < MAZE_SIZE; r++) {
+                    for (let c = 0; c < MAZE_SIZE; c++) {
+                        if (this.grid[r][c] === 1) {
+                            const wall = new THREE.Mesh(wallGeo, wallMatBlood);
+                            const x = c * CELL_SIZE + CELL_SIZE / 2;
+                            const z = r * CELL_SIZE + CELL_SIZE / 2;
+                            wall.position.set(x, WALL_HEIGHT / 2, z);
+                            scene.add(wall);
+
+                            const box = new THREE.Box3().setFromObject(wall);
+                            this.wallBoxes.push(box);
+                        }
+                    }
+                }
+
+                this.spawnObjects();
+            }
+
+            spawnObjects() {
+                const loader = new THREE.GLTFLoader();
+
+                // 1. CROWBAR MODEL (fiualk.glb)
+                const cbX = 2.5 * CELL_SIZE;
+                const cbZ = 2.5 * CELL_SIZE;
+                const cbGroup = new THREE.Group();
+                cbGroup.position.set(cbX, 0.4, cbZ);
+                scene.add(cbGroup);
+
+                loader.load('https://files.catbox.moe/fiualk.glb', (gltf) => {
+                    const model = gltf.scene;
+                    model.scale.set(0.75, 0.75, 0.75);
+                    cbGroup.add(model);
+                }, undefined, () => {
+                    const cbFallback = new THREE.Mesh(
+                        new THREE.CylinderGeometry(0.04, 0.04, 0.9, 8),
+                        new THREE.MeshStandardMaterial({ color: 0xaaaaaa, metalness: 0.9 })
+                    );
+                    cbFallback.rotation.z = Math.PI / 3;
+                    cbGroup.add(cbFallback);
+                });
+                
+                this.crowbar = { mesh: cbGroup, collected: false, pos: new THREE.Vector3(cbX, 0.4, cbZ) };
+
+                // 2. WOODEN CRATES & KEYS (ovpxen.glb & 365tnf.glb)
+                const boxLocations = [
+                    { x: (MAZE_SIZE - 2.5) * CELL_SIZE, z: 2.5 * CELL_SIZE },
+                    { x: 2.5 * CELL_SIZE, z: (MAZE_SIZE - 2.5) * CELL_SIZE },
+                    { x: (MAZE_SIZE - 2.5) * CELL_SIZE, z: (MAZE_SIZE - 2.5) * CELL_SIZE }
+                ];
+
+                const realKeyIndex = Math.floor(Math.random() * boxLocations.length);
+
+                loader.load('https://files.catbox.moe/365tnf.glb', (keyGltf) => {
+                    loader.load('https://files.catbox.moe/ovpxen.glb', (boxGltf) => {
+
+                        boxLocations.forEach((loc, index) => {
+                            const isRealKey = (index === realKeyIndex);
+
+                            const boxGroup = new THREE.Group();
+                            boxGroup.position.set(loc.x, 0.6, loc.z);
+                            scene.add(boxGroup);
+
+                            const boxModel = boxGltf.scene.clone();
+                            boxModel.scale.set(0.85, 0.85, 0.85);
+                            boxGroup.add(boxModel);
+
+                            const keyGroup = new THREE.Group();
+                            keyGroup.position.set(loc.x, 0.6, loc.z);
+                            keyGroup.visible = false;
+                            scene.add(keyGroup);
+
+                            const keyModel = keyGltf.scene.clone();
+                            keyModel.scale.set(0.65, 0.65, 0.65);
+                            keyGroup.add(keyModel);
+
+                            this.boxes.push({
+                                id: index,
+                                boxMesh: boxGroup,
+                                keyMesh: keyGroup,
+                                opened: false,
+                                keyPicked: false,
+                                isRealKey: isRealKey,
+                                pos: new THREE.Vector3(loc.x, 0.6, loc.z)
+                            });
+                        });
+
+                    }, undefined, () => this.setupBoxFallback(boxLocations, realKeyIndex));
+                }, undefined, () => this.setupBoxFallback(boxLocations, realKeyIndex));
+
+                // 3. MAIN EXIT GATE WITH GLOW LIGHT (INDICATOR)
+                const gateX = (MAZE_SIZE - 1.5) * CELL_SIZE;
+                const gateZ = (MAZE_SIZE - 1.5) * CELL_SIZE;
+
+                const gateMat = new THREE.MeshStandardMaterial({ color: 0x4a2a18, roughness: 0.5 });
+                const gate = new THREE.Mesh(new THREE.BoxGeometry(CELL_SIZE * 0.95, WALL_HEIGHT, 0.5), gateMat);
+                gate.position.set(gateX, WALL_HEIGHT/2, gateZ);
+                scene.add(gate);
+
+                // GLOW LIGHT AT GATE (BEACON)
+                const gateLight = new THREE.PointLight(0xffaa00, 3.5, 25);
+                gateLight.position.set(gateX, WALL_HEIGHT - 0.5, gateZ);
+                scene.add(gateLight);
+
+                const gateBox = new THREE.Box3().setFromObject(gate);
+                this.wallBoxes.push(gateBox);
+
+                this.exitGate = { mesh: gate, open: false, light: gateLight };
+            }
+
+            setupBoxFallback(boxLocations, realKeyIndex) {
+                if (this.boxes.length > 0) return;
+                boxLocations.forEach((loc, index) => {
+                    const isRealKey = (index === realKeyIndex);
+
+                    const boxGroup = new THREE.Group();
+                    boxGroup.position.set(loc.x, 0.6, loc.z);
+                    const crateGeom = new THREE.BoxGeometry(1.2, 1.2, 1.2);
+                    const crateMat = new THREE.MeshStandardMaterial({ color: 0x8b5a2b, roughness: 0.8 });
+                    boxGroup.add(new THREE.Mesh(crateGeom, crateMat));
+                    scene.add(boxGroup);
+
+                    const keyGroup = new THREE.Group();
+                    keyGroup.position.set(loc.x, 0.6, loc.z);
+                    keyGroup.visible = false;
+                    const keyMat = new THREE.MeshStandardMaterial({ color: 0xffcc00, metalness: 0.9 });
+                    keyGroup.add(new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.05, 8, 16), keyMat));
+                    scene.add(keyGroup);
+
+                    this.boxes.push({
+                        id: index,
+                        boxMesh: boxGroup,
+                        keyMesh: keyGroup,
+                        opened: false,
+                        keyPicked: false,
+                        isRealKey: isRealKey,
+                        pos: new THREE.Vector3(loc.x, 0.6, loc.z)
+                    });
+                });
+            }
+
+            resetGamePositions() {
+                this.player.reset(1.5 * CELL_SIZE, 1.5 * CELL_SIZE);
+                this.maja.reset(3.5 * CELL_SIZE, 3.5 * CELL_SIZE);
+            }
+
+            setupUI() {
+                document.getElementById('start-btn').onclick = () => {
+                    audio.playBgMusic();
+                    document.getElementById('start-screen').style.display = 'none';
+                    this.showDayCutscene(1);
+                };
+            }
+
+            showDayCutscene(day) {
+                currentState = STATES.CUTSCENE;
+                dayCount = day;
+
+                const dayScr = document.getElementById('day-screen');
+                dayScr.innerText = `DAY ${day}`;
+                dayScr.style.display = 'flex';
+
+                setTimeout(() => {
+                    dayScr.style.display = 'none';
+                    currentState = STATES.PLAYING;
+                }, 1800);
+            }
+
+            checkInteractions() {
+                const btnInteract = document.getElementById('btn-interact');
+                const prompt = document.getElementById('interaction-prompt');
+
+                let canInteract = false;
+                this.activePromptObject = null;
+
+                if (!this.crowbar.collected && camera.position.distanceTo(this.crowbar.pos) < 3.0) {
+                    canInteract = true;
+                    this.activePromptObject = { type: 'crowbar' };
+                    prompt.innerText = "PICK UP CROWBAR";
+                    btnInteract.innerText = "TAKE";
+                }
+                else {
+                    for (let boxObj of this.boxes) {
+                        if (camera.position.distanceTo(boxObj.pos) < 3.2) {
+                            if (!boxObj.opened) {
+                                if (this.hasCrowbar) {
+                                    canInteract = true;
+                                    this.activePromptObject = { type: 'box', target: boxObj };
+                                    prompt.innerText = "BREAK CRATE WITH CROWBAR";
+                                    btnInteract.innerText = "BREAK";
+                                } else {
+                                    prompt.innerText = "NEED CROWBAR TO BREAK CRATE!";
+                                    prompt.style.display = 'block';
+                                    btnInteract.style.display = 'none';
+                                    return;
+                                }
+                            } else if (!boxObj.keyPicked) {
+                                canInteract = true;
+                                this.activePromptObject = { type: 'key', target: boxObj };
+                                prompt.innerText = boxObj.isRealKey ? "TAKE REAL MAIN EXIT KEY!" : "TAKE KEY";
+                                btnInteract.innerText = "KEY";
+                            }
+                            break;
+                        }
+                    }
+                }
+
+                if (!this.exitGate.open && camera.position.distanceTo(this.exitGate.mesh.position) < 3.5) {
+                    if (this.hasMainKey) {
+                        canInteract = true;
+                        this.activePromptObject = { type: 'gate' };
+                        prompt.innerText = "UNLOCK MAIN GATE";
+                        btnInteract.innerText = "OPEN";
+                    } else {
+                        prompt.innerText = "GATE LOCKED! (FIND REAL KEY IN CRATES)";
+                        prompt.style.display = 'block';
+                        btnInteract.style.display = 'none';
+                        return;
+                    }
+                }
+
+                btnInteract.style.display = canInteract ? 'flex' : 'none';
+                prompt.style.display = canInteract ? 'block' : 'none';
+            }
+
+            interact() {
+                if (!this.activePromptObject) return;
+
+                if (this.activePromptObject.type === 'crowbar') {
+                    this.crowbar.collected = true;
+                    scene.remove(this.crowbar.mesh);
+                    this.hasCrowbar = true;
+                    this.player.holdItemInHand('crowbar');
+                    audio.playCrowbar();
+                }
+                else if (this.activePromptObject.type === 'box') {
+                    const boxObj = this.activePromptObject.target;
+                    boxObj.opened = true;
+                    scene.remove(boxObj.boxMesh);
+                    boxObj.keyMesh.visible = true;
+                    audio.playBoxBreak();
+                }
+                else if (this.activePromptObject.type === 'key') {
+                    const boxObj = this.activePromptObject.target;
+                    boxObj.keyPicked = true;
+                    scene.remove(boxObj.keyMesh);
+
+                    if (boxObj.isRealKey) {
+                        this.hasMainKey = true;
+                        this.player.holdItemInHand('key');
+                        audio.playKeyPickup();
+                    } else {
+                        audio.playKeyPickup();
+                        const prompt = document.getElementById('interaction-prompt');
+                        prompt.innerText = "FAKE KEY! FIND OTHER CRATES!";
+                        prompt.style.display = 'block';
+                    }
+                }
+                else if (this.activePromptObject.type === 'gate') {
+                    this.exitGate.open = true;
+                    scene.remove(this.exitGate.mesh);
+                    scene.remove(this.exitGate.light);
+
+                    currentState = STATES.VICTORY;
+                    document.getElementById('victory-screen').style.display = 'flex';
+                }
+            }
+
+            triggerDeathCutscene() {
+                currentState = STATES.CUTSCENE;
+                audio.playJumpscare();
+
+                const jumpscare = document.getElementById('jumpscare-overlay');
+                jumpscare.style.display = 'flex';
+
+                setTimeout(() => {
+                    jumpscare.style.display = 'none';
+
+                    if (dayCount < 3) {
+                        this.resetGamePositions();
+                        this.showDayCutscene(dayCount + 1);
+                    } else {
+                        currentState = STATES.DEAD;
+                        document.getElementById('death-screen').style.display = 'flex';
+                    }
+                }, 2200);
+            }
+
+            animate() {
+                requestAnimationFrame(() => this.animate());
+
+                const delta = clock.getDelta();
+
+                if (currentState === STATES.PLAYING) {
+                    this.player.update(delta, this.wallBoxes);
+                    this.maja.update(delta, this.player, this.wallBoxes);
+                    this.checkInteractions();
+
+                    if (!this.crowbar.collected) {
+                        this.crowbar.mesh.rotation.y += delta * 1.5;
+                    }
+
+                    this.boxes.forEach(b => {
+                        if (b.opened && !b.keyPicked) {
+                            b.keyMesh.rotation.y += delta * 2;
+                        }
+                    });
+                }
+
+                renderer.render(scene, camera);
+            }
+        }
+
+        let game = new Game();
+    </script>
+</body>
+</html>
