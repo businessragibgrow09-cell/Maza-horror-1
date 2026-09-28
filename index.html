@@ -55,7 +55,7 @@
 
         .action-btn {
             position: absolute; z-index: 14;
-            background: rgba(0, 0, 0, 0.8);
+            background: rgba(0, 0, 0, 0.85);
             border: 2px solid #fff; color: #fff;
             border-radius: 50%; font-weight: bold; font-size: 0.85rem;
             display: flex; justify-content: center; align-items: center;
@@ -65,14 +65,14 @@
 
         .overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(10, 10, 15, 0.96);
+            background: rgba(10, 10, 15, 0.98);
             display: flex; flex-direction: column;
             justify-content: center; align-items: center;
             color: #fff; z-index: 20; text-align: center; padding: 20px;
         }
 
         .title { font-size: 2.2rem; color: #ff2222; text-shadow: 0 0 15px #ff0000; margin-bottom: 12px; }
-        .subtitle { font-size: 0.95rem; color: #bbb; margin-bottom: 22px; line-height: 1.6; max-width: 600px; }
+        .subtitle { font-size: 0.95rem; color: #ccc; margin-bottom: 22px; line-height: 1.6; max-width: 600px; }
         .btn { padding: 12px 28px; font-size: 1rem; background: #111; color: #ff2222; border: 2px solid #ff2222; font-weight: bold; border-radius: 8px; cursor: pointer; }
 
         #interaction-prompt {
@@ -90,7 +90,7 @@
 
         #jumpscare-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(180, 0, 0, 0.95);
+            background: rgba(160, 0, 0, 0.96);
             z-index: 35; display: none; flex-direction: column;
             justify-content: center; align-items: center;
         }
@@ -103,19 +103,18 @@
         }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 </head>
 <body>
 
     <script>
-        function forceLandscapeMode() {
+        function forceLandscape() {
             if (screen.orientation && screen.orientation.lock) {
                 screen.orientation.lock('landscape').catch(() => {});
             }
         }
-        window.addEventListener('load', () => { forceLandscapeMode(); });
+        window.addEventListener('load', forceLandscape);
         document.addEventListener('click', () => {
-            forceLandscapeMode();
+            forceLandscape();
             if (document.documentElement.requestFullscreen) {
                 document.documentElement.requestFullscreen().catch(() => {});
             }
@@ -143,17 +142,17 @@
         <div id="start-screen" class="overlay">
             <h1 class="title">MAJA TOILET ESCAPE</h1>
             <p class="subtitle">
-                Story: Locked inside the cursed washroom, Maja is hunting you!<br>
+                Story: Trapped in the haunted yellow washroom!<br>
                 1. Find the Crowbar.<br>
-                2. Smash crates to find the REAL Exit Key.<br>
-                3. Open the Main Gate & Escape!
+                2. Smash bathroom crates to find the Exit Key.<br>
+                3. Unlock the Main Gate and Escape!
             </p>
             <button class="btn" id="start-btn">START SURVIVAL</button>
         </div>
 
         <div id="victory-screen" class="overlay" style="display: none;">
             <h1 class="title" style="color: #00ff66;">ESCAPE SUCCESSFUL!</h1>
-            <p class="subtitle">You successfully unlocked the main gate and escaped!</p>
+            <p class="subtitle">You successfully unlocked the main gate and escaped the toilet maze!</p>
             <button class="btn" onclick="location.reload()">PLAY AGAIN</button>
         </div>
 
@@ -175,39 +174,6 @@
 
         let scene, camera, renderer, clock;
         let dayCount = 1;
-
-        class SoundEngine {
-            constructor() {
-                this.bgMusic = new Audio('https://files.catbox.moe/t1l55y');
-                this.bgMusic.loop = true;
-                this.bgMusic.volume = 0.4;
-
-                this.monsterNearbySound = new Audio('https://files.catbox.moe/dfmfqq');
-                this.monsterNearbySound.loop = true;
-                this.monsterNearbySound.volume = 0;
-
-                this.sndCrowbar = new Audio('https://files.catbox.moe/m5zp5k.mp3');
-                this.sndBoxBreak = new Audio('https://files.catbox.moe/3gar1e.mp3');
-                this.sndKeyPickup = new Audio('https://files.catbox.moe/oaj33c.mp3');
-                this.sndJumpscare = new Audio('https://files.catbox.moe/3mbkym.mp3');
-
-                document.addEventListener("visibilitychange", () => {
-                    if (document.hidden) {
-                        this.pauseAll();
-                    } else if (currentState === STATES.PLAYING) {
-                        this.playBgMusic();
-                    }
-                });
-            }
-            playBgMusic() { if (!document.hidden) { this.bgMusic.play().catch(()=>{}); this.monsterNearbySound.play().catch(()=>{}); } }
-            pauseAll() { this.bgMusic.pause(); this.monsterNearbySound.pause(); }
-            setNearbyVolume(vol) { if (!document.hidden) { this.monsterNearbySound.volume = Math.min(1.0, Math.max(0, vol)); } else { this.monsterNearbySound.volume = 0; } }
-            playCrowbar() { if(!document.hidden){ this.sndCrowbar.currentTime = 0; this.sndCrowbar.play().catch(()=>{}); } }
-            playBoxBreak() { if(!document.hidden){ this.sndBoxBreak.currentTime = 0; this.sndBoxBreak.play().catch(()=>{}); } }
-            playKeyPickup() { if(!document.hidden){ this.sndKeyPickup.currentTime = 0; this.sndKeyPickup.play().catch(()=>{}); } }
-            playJumpscare() { if(!document.hidden){ this.sndJumpscare.currentTime = 0; this.sndJumpscare.play().catch(()=>{}); } }
-        }
-        const audio = new SoundEngine();
 
         class MobilePlayerController {
             constructor(camera) {
@@ -245,22 +211,21 @@
                 this.camera.add(this.handsGroup);
             }
 
-            attachCrowbarToHand(crowbarMesh) {
+            attachCrowbarToHand() {
                 if (this.heldItem) this.rightArm.remove(this.heldItem);
-                const group = new THREE.Group();
-                crowbarMesh.scale.set(0.8, 0.8, 0.8);
-                crowbarMesh.rotation.set(Math.PI / 2, 0, Math.PI / 4);
-                crowbarMesh.position.set(0, 0.1, -0.1);
-                group.add(crowbarMesh);
-                this.heldItem = group;
+                const cbGroup = new THREE.Group();
+                const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.0, 8), new THREE.MeshStandardMaterial({ color: 0xffcc00, metalness: 0.8 }));
+                bar.rotation.z = Math.PI / 4;
+                cbGroup.add(bar);
+                cbGroup.position.set(0, 0.1, -0.3);
+                this.heldItem = cbGroup;
                 this.rightArm.add(this.heldItem);
             }
 
             attachKeyToHand() {
                 if (this.heldItem) this.rightArm.remove(this.heldItem);
-                const keyMat = new THREE.MeshStandardMaterial({ color: 0xffcc00, metalness: 0.9 });
-                const keyMesh = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.02, 8, 16), keyMat);
-                keyMesh.position.set(0, 0.1, -0.1);
+                const keyMesh = new THREE.Mesh(new THREE.TorusGeometry(0.08, 0.025, 8, 16), new THREE.MeshStandardMaterial({ color: 0xffaa00, metalness: 0.9 }));
+                keyMesh.position.set(0, 0.1, -0.3);
                 this.heldItem = keyMesh;
                 this.rightArm.add(this.heldItem);
             }
@@ -393,33 +358,31 @@
                 this.scene = scene;
                 this.mesh = new THREE.Group();
                 this.scene.add(this.mesh);
-                this.mixer = null;
-                this.speed = 4.2;
+                this.speed = 3.8;
                 this.isChasing = false;
                 this.patrolTarget = new THREE.Vector3();
 
-                this.loadOriginalMajaModel();
+                this.createMajaAvatar();
                 this.chooseNewPatrolTarget();
             }
 
-            loadOriginalMajaModel() {
-                const loader = new THREE.GLTFLoader();
-                loader.load('https://files.catbox.moe/gbxua4.glb', (gltf) => {
-                    const model = gltf.scene;
-                    model.scale.set(1.6, 1.6, 1.6);
-                    model.position.y = 0;
-                    this.mesh.add(model);
+            createMajaAvatar() {
+                // डरावनी भूतिया चुड़ैल (Maja) बिना इंटरनेट मॉडल के
+                const dressMat = new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.8 });
+                const skinMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.5 });
+                const hairMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
 
-                    if (gltf.animations && gltf.animations.length > 0) {
-                        this.mixer = new THREE.AnimationMixer(model);
-                        const action = this.mixer.clipAction(gltf.animations[0]);
-                        action.play();
-                    }
-                }, undefined, () => {
-                    const fallback = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 2.8), new THREE.MeshStandardMaterial({ color: 0xaa0000 }));
-                    fallback.position.y = 1.4;
-                    this.mesh.add(fallback);
-                });
+                const body = new THREE.Mesh(new THREE.ConeGeometry(0.7, 2.6, 8), dressMat);
+                body.position.y = 1.3;
+                this.mesh.add(body);
+
+                const head = new THREE.Mesh(new THREE.SphereGeometry(0.35, 12, 12), skinMat);
+                head.position.y = 2.8;
+                this.mesh.add(head);
+
+                const hair = new THREE.Mesh(new THREE.SphereGeometry(0.38, 8, 8), hairMat);
+                hair.position.set(0, 2.9, -0.05);
+                this.mesh.add(hair);
             }
 
             chooseNewPatrolTarget() {
@@ -432,21 +395,18 @@
 
             update(delta, player, wallBoxes) {
                 if (currentState !== STATES.PLAYING) return;
-                if (this.mixer) this.mixer.update(delta);
 
                 const distToPlayer = this.mesh.position.distanceTo(player.camera.position);
 
-                if (distToPlayer < 16) { this.isChasing = true; } 
+                if (distToPlayer < 15) { this.isChasing = true; } 
                 else if (distToPlayer > 22) { this.isChasing = false; }
 
                 const dangerInd = document.getElementById('danger-indicator');
                 if (this.isChasing) {
-                    const intensity = Math.max(0, 1 - distToPlayer / 16);
-                    dangerInd.style.boxShadow = `inset 0 0 ${intensity * 90}px rgba(200, 0, 0, ${intensity * 0.85})`;
-                    audio.setNearbyVolume(intensity);
+                    const intensity = Math.max(0, 1 - distToPlayer / 15);
+                    dangerInd.style.boxShadow = `inset 0 0 ${intensity * 90}px rgba(220, 0, 0, ${intensity * 0.85})`;
                 } else {
                     dangerInd.style.boxShadow = `inset 0 0 0px rgba(255,0,0,0)`;
-                    audio.setNearbyVolume(0);
                 }
 
                 let destination = this.isChasing ? player.camera.position : this.patrolTarget;
@@ -457,12 +417,24 @@
                 const dir = new THREE.Vector3().subVectors(destination, this.mesh.position);
                 dir.y = 0; dir.normalize();
                 
-                // सिंपल मूवमेंट बिना दीवार पार किए
-                this.mesh.position.add(dir.multiplyScalar(this.speed * delta));
-                this.mesh.lookAt(destination.x, 0, destination.z);
+                const nextPos = this.mesh.position.clone().add(dir.multiplyScalar(this.speed * delta));
+                
+                // दीवार कोलिजन ताकि माजा आर-पार न जाए
+                const majaBox = new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(nextPos.x, 1.4, nextPos.z), new THREE.Vector3(0.8, 2.5, 0.8));
+                let hitWall = false;
+                for (let box of wallBoxes) {
+                    if (majaBox.intersectsBox(box)) { hitWall = true; break; }
+                }
 
-                // पकड़े जाने पर अटैक और जंपस्केयर
-                if (distToPlayer < 2.0) {
+                if (!hitWall) {
+                    this.mesh.position.copy(nextPos);
+                } else {
+                    this.chooseNewPatrolTarget();
+                }
+
+                this.mesh.lookAt(destination.x, this.mesh.position.y, destination.z);
+
+                if (distToPlayer < 1.8) {
                     game.triggerDeathCutscene();
                 }
             }
@@ -474,7 +446,6 @@
                 this.wallBoxes = [];
                 this.exitGate = null;
                 this.crowbar = null;
-                this.crowbarRawModel = null;
                 this.hasCrowbar = false;
                 this.boxes = [];
                 this.hasMainKey = false;
@@ -492,7 +463,7 @@
 
             initEngine() {
                 scene = new THREE.Scene();
-                scene.background = new THREE.Color(0x040406);
+                scene.background = new THREE.Color(0x0a0a0e);
 
                 camera = new THREE.PerspectiveCamera(80, window.innerWidth / window.innerHeight, 0.1, 150);
                 scene.add(camera);
@@ -504,8 +475,8 @@
 
                 clock = new THREE.Clock();
 
-                scene.add(new THREE.AmbientLight(0xffffff, 1.1));
-                const flashLight = new THREE.SpotLight(0xffffff, 3.5, 45, Math.PI / 3, 0.5);
+                scene.add(new THREE.AmbientLight(0xffeedd, 0.9));
+                const flashLight = new THREE.SpotLight(0xfff5cc, 3.0, 40, Math.PI / 3, 0.4);
                 camera.add(flashLight);
                 camera.add(flashLight.target);
                 flashLight.target.position.set(0, 0, -1);
@@ -530,9 +501,10 @@
                     [1,1,1,1,1,1,1,1,1]
                 ];
 
-                const wallMat = new THREE.MeshStandardMaterial({ color: 0x33333d, roughness: 0.7 });
-                const floorMat = new THREE.MeshStandardMaterial({ color: 0x16161b, roughness: 0.9 });
-                const ceilingMat = new THREE.MeshStandardMaterial({ color: 0x22222a, roughness: 0.9 });
+                // पीला-पीला बाथरूम/टॉयलेट फील देने वाला टेक्सचर और रंग
+                const wallMat = new THREE.MeshStandardMaterial({ color: 0x998844, roughness: 0.6 });
+                const floorMat = new THREE.MeshStandardMaterial({ color: 0x333322, roughness: 0.8 });
+                const ceilingMat = new THREE.MeshStandardMaterial({ color: 0x222218, roughness: 0.9 });
 
                 const floor = new THREE.Mesh(new THREE.PlaneGeometry(MAZE_SIZE * CELL_SIZE, MAZE_SIZE * CELL_SIZE), floorMat);
                 floor.rotation.x = -Math.PI / 2;
@@ -559,31 +531,22 @@
             }
 
             spawnObjects() {
-                const loader = new THREE.GLTFLoader();
-
                 // क्रोबार स्पॉन
                 const cbX = 1.5 * CELL_SIZE, cbZ = 1.5 * CELL_SIZE;
                 const cbGroup = new THREE.Group();
                 cbGroup.position.set(cbX, 0.5, cbZ);
+                const cbMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.2, 8), new THREE.MeshStandardMaterial({ color: 0xffcc00, metalness: 0.9 }));
+                cbMesh.rotation.z = Math.PI / 3;
+                cbGroup.add(cbMesh);
                 scene.add(cbGroup);
 
-                const cbLight = new THREE.PointLight(0xffff00, 2, 8);
+                const cbLight = new THREE.PointLight(0xffff00, 1.5, 6);
                 cbLight.position.set(cbX, 1.5, cbZ);
                 scene.add(cbLight);
 
-                loader.load('https://files.catbox.moe/fiualk.glb', (gltf) => {
-                    const model = gltf.scene;
-                    model.scale.set(1.2, 1.2, 1.2);
-                    this.crowbarRawModel = model.clone();
-                    cbGroup.add(model);
-                }, undefined, () => {
-                    const fallback = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.2, 8), new THREE.MeshStandardMaterial({ color: 0xffcc00, metalness: 0.9 }));
-                    this.crowbarRawModel = fallback.clone();
-                    cbGroup.add(fallback);
-                });
                 this.crowbar = { mesh: cbGroup, light: cbLight, collected: false, pos: new THREE.Vector3(cbX, 0.5, cbZ) };
 
-                // बक्से (Crates)
+                // टॉयलेट/बाथरूम क्रेट्स और बॉक्सेज
                 const boxLocs = [
                     { x: 7.5 * CELL_SIZE, z: 1.5 * CELL_SIZE },
                     { x: 1.5 * CELL_SIZE, z: 7.5 * CELL_SIZE },
@@ -594,28 +557,16 @@
                 boxLocs.forEach((loc, index) => {
                     const boxGroup = new THREE.Group();
                     boxGroup.position.set(loc.x, 0.8, loc.z);
+                    const crateMesh = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.6, 1.6), new THREE.MeshStandardMaterial({ color: 0x6b4423, roughness: 0.7 }));
+                    boxGroup.add(crateMesh);
                     scene.add(boxGroup);
-
-                    loader.load('https://files.catbox.moe/ovpxen.glb', (boxGltf) => {
-                        const m = boxGltf.scene.clone();
-                        m.scale.set(1.4, 1.4, 1.4);
-                        boxGroup.add(m);
-                    }, undefined, () => {
-                        boxGroup.add(new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.5, 1.5), new THREE.MeshStandardMaterial({ color: 0x8b5a2b })));
-                    });
 
                     const keyGroup = new THREE.Group();
                     keyGroup.position.set(loc.x, 0.8, loc.z);
                     keyGroup.visible = false;
+                    const keyMesh = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.08, 8, 16), new THREE.MeshStandardMaterial({ color: 0xffcc00, metalness: 0.9 }));
+                    keyGroup.add(keyMesh);
                     scene.add(keyGroup);
-
-                    loader.load('https://files.catbox.moe/365tnf.glb', (keyGltf) => {
-                        const m = keyGltf.scene.clone();
-                        m.scale.set(1.0, 1.0, 1.0);
-                        keyGroup.add(m);
-                    }, undefined, () => {
-                        keyGroup.add(new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.08, 8, 16), new THREE.MeshStandardMaterial({ color: 0xffcc00, metalness: 0.9 })));
-                    });
 
                     this.boxes.push({
                         boxMesh: boxGroup, keyMesh: keyGroup, opened: false, keyPicked: false,
@@ -623,7 +574,7 @@
                     });
                 });
 
-                // **मेन गेट (Main Exit Gate)**
+                // **मेन एग्जिट गेट (Main Exit Gate)**
                 const gateX = 4.5 * CELL_SIZE, gateZ = 8.5 * CELL_SIZE;
                 const gateGroup = new THREE.Group();
                 gateGroup.position.set(gateX, WALL_HEIGHT/2, gateZ);
@@ -632,7 +583,7 @@
                 gateGroup.add(gateMesh);
                 scene.add(gateGroup);
 
-                const gateLight = new THREE.PointLight(0x00ffcc, 4, 30);
+                const gateLight = new THREE.PointLight(0x00ffcc, 3, 20);
                 gateLight.position.set(gateX, WALL_HEIGHT - 1.0, gateZ);
                 scene.add(gateLight);
 
@@ -647,7 +598,6 @@
 
             setupUI() {
                 document.getElementById('start-btn').onclick = () => {
-                    audio.playBgMusic();
                     document.getElementById('start-screen').style.display = 'none';
                     this.showDayCutscene(1);
                 };
@@ -724,14 +674,12 @@
                     this.crowbar.collected = true;
                     scene.remove(this.crowbar.mesh); scene.remove(this.crowbar.light);
                     this.hasCrowbar = true;
-                    if (this.crowbarRawModel) this.player.attachCrowbarToHand(this.crowbarRawModel);
-                    audio.playCrowbar();
+                    this.player.attachCrowbarToHand();
                 } else if (this.activePromptObject.type === 'box') {
                     const boxObj = this.activePromptObject.target;
                     boxObj.opened = true;
                     scene.remove(boxObj.boxMesh);
                     boxObj.keyMesh.visible = true;
-                    audio.playBoxBreak();
                 } else if (this.activePromptObject.type === 'key') {
                     const boxObj = this.activePromptObject.target;
                     boxObj.keyPicked = true;
@@ -739,9 +687,7 @@
                     if (boxObj.isRealKey) {
                         this.hasMainKey = true;
                         this.player.attachKeyToHand();
-                        audio.playKeyPickup();
                     } else {
-                        audio.playKeyPickup();
                         const prompt = document.getElementById('interaction-prompt');
                         prompt.innerText = "FAKE KEY! CHECK OTHER CRATES!";
                         prompt.style.display = 'block';
@@ -757,7 +703,6 @@
             triggerDeathCutscene() {
                 if (currentState !== STATES.PLAYING) return;
                 currentState = STATES.CUTSCENE;
-                audio.playJumpscare();
                 const jumpscare = document.getElementById('jumpscare-overlay');
                 jumpscare.style.display = 'flex';
 
